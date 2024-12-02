@@ -3,9 +3,8 @@ sys.path.append('../')
 import holoclean
 from detect import ErrorsLoaderDetector
 from repair.featurize import *
+import os
 
-
-# 1. Setup a HoloClean session.
 hc = holoclean.HoloClean(
     db_name='holo',
     domain_thresh_1=0,
@@ -26,31 +25,106 @@ hc = holoclean.HoloClean(
     print_fw=True
 ).session
 
-# 2. Load training data and denial constraints.
-hc.load_data('hospital', '../testdata/hospital.csv')
-hc.load_dcs('../testdata/hospital_constraints.txt')
-hc.ds.set_constraints(hc.get_dcs())
 
-# 3. Detect erroneous cells.
-error_loader = ErrorsLoaderDetector(
+def clean_data(schema_name, file_path, constraint_path):
+    hc.load_data(schema_name, file_path)
+    hc.load_dcs(constraint_path)
+    hc.ds.set_constraints(hc.get_dcs())
+
+    error_loader = ErrorsLoaderDetector(
         db_engine=hc.ds.engine,
-        schema_name='hospital',
+        schema_name=schema_name,
         table_name='dk_cells'
-)
-hc.detect_errors([error_loader])
+    )
+    hc.detect_errors([error_loader])
 
-# 4. Repair errors utilizing the defined features.
-hc.setup_domain()
-featurizers = [
-    OccurAttrFeaturizer(),
-    FreqFeaturizer(),
-    ConstraintFeaturizer(),
-]
+    hc.setup_domain()
+    featurizers = [
+        OccurAttrFeaturizer(),
+        FreqFeaturizer(),
+        ConstraintFeaturizer(),
+    ]
 
-hc.repair_errors(featurizers)
+    hc.repair_errors(featurizers)
 
-# 5. Evaluate the correctness of the results.
-hc.evaluate(fpath='../testdata/hospital_clean.csv',
-            tid_col='tid',
-            attr_col='attribute',
-            val_col='correct_val')
+    hc.evaluate(fpath=f'../cleaned/{schema_name}_clean.csv',
+                tid_col='tid',
+                attr_col='attribute',
+                val_col='correct_val')
+    
+
+def clean_data(schema_name, file_path, constraint_path):
+    hc.load_data(schema_name, file_path)
+    hc.load_dcs(constraint_path)
+    hc.ds.set_constraints(hc.get_dcs())
+
+    error_loader = ErrorsLoaderDetector(
+        db_engine=hc.ds.engine,
+        schema_name=schema_name,
+        table_name='dk_cells'
+    )
+    hc.detect_errors([error_loader])
+
+    hc.setup_domain()
+    featurizers = [
+        OccurAttrFeaturizer(),
+        FreqFeaturizer(),
+        ConstraintFeaturizer(),
+    ]
+
+    hc.repair_errors(featurizers)
+
+    hc.evaluate(fpath=f'../cleaned/{schema_name}_clean.csv',
+                tid_col='tid',
+                attr_col='attribute',
+                val_col='correct_val')
+    
+
+def clean_data(schema_name, file_path, constraint_path):
+    hc.load_data(schema_name, file_path)
+    hc.load_dcs(constraint_path)
+    hc.ds.set_constraints(hc.get_dcs())
+
+    error_loader = ErrorsLoaderDetector(
+        db_engine=hc.ds.engine,
+        schema_name=schema_name,
+        table_name='dk_cells'
+    )
+    hc.detect_errors([error_loader])
+
+    hc.setup_domain()
+    featurizers = [
+        OccurAttrFeaturizer(),
+        FreqFeaturizer(),
+        ConstraintFeaturizer(),
+    ]
+
+    hc.repair_errors(featurizers)
+
+    hc.evaluate(fpath=f'../cleaned/{schema_name}_clean.csv',
+                tid_col='tid',
+                attr_col='attribute',
+                val_col='correct_val')
+    
+
+def main():
+    data_folder = './data'
+    constraint_folder = './constraint'
+
+    data_files = [f for f in os.listdir(data_folder) if f.endswith('.csv')]
+
+    for data_file in data_files:
+        schema_name = os.path.splitext(data_file)[0]
+        data_path = os.path.join(data_folder, data_file)
+        constraint_file = f"{schema_name}_constraint.dc"
+        constraint_path = os.path.join(constraint_folder, constraint_file)
+
+        if not os.path.exists(constraint_path):
+            print(f"Constraint file not found for schema: {schema_name}, skipping...")
+            continue
+
+        print(f"Processing schema: {schema_name}")
+        clean_data(schema_name, data_path, constraint_path)
+
+if __name__ == "__main__":
+    main()
