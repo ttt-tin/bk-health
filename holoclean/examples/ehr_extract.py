@@ -18,8 +18,10 @@ def processOneFile(sample_df,
                     procedure_df):
 
     for index, row in sample_df.iterrows():
-        tempdf=pd.json_normalize(row.entry)
-        tempdf.columns = tempdf.columns.str.replace("resource.", "")
+        tempdf = pd.json_normalize(row.entry)
+        tempdf.columns = tempdf.columns.str.replace("resource.", "", regex=False)
+
+
 
         if str(tempdf['resourceType'][0])=="Patient":
             tempdf = processPatient(tempdf)
@@ -80,23 +82,23 @@ def cleanAndRename(patient_df,
                     procedure_df):
     for df in [patient_df, careplan_df, condition_df, diagnostic_report_df,
                  encounter_df, immunization_df, observation_df, procedure_df]:
-        df.columns = df.columns.str.replace("resource.", "")
-        df.drop(columns=['resourceType'], inplace=True)
+        df.columns = df.columns.str.replace("resource.", "", regex=False)
+        df.drop(columns=['resource.resourceType'], inplace=True)
     
     for df in [patient_df, condition_df, diagnostic_report_df, observation_df, encounter_df]:
-        df['fullUrl']= df['fullUrl'].str.replace('urn:uuid:', '')
+        df['fullUrl']= df['fullUrl'].str.replace('urn:uuid:', '', regex=False)
         
     for df in [encounter_df, immunization_df]:
-        df['patient.reference'] = df['patient.reference'].str.replace('urn:uuid:', '')
+        df['patient.reference'] = df['patient.reference'].str.replace('urn:uuid:', '', regex=False)
         
     for df in [immunization_df, diagnostic_report_df, observation_df, procedure_df]:
-        df['encounter.reference'] = df['encounter.reference'].str.replace('urn:uuid:', '')
+        df['encounter.reference'] = df['encounter.reference'].str.replace('urn:uuid:', '', regex=False)
         
     for df in [observation_df, procedure_df, careplan_df, condition_df, diagnostic_report_df]:
-        df['subject.reference'] = df['subject.reference'].str.replace('urn:uuid:', '')
+        df['subject.reference'] = df['subject.reference'].str.replace('urn:uuid:', '', regex=False)
 
     for df in [careplan_df, condition_df]:
-        df['context.reference'] = df['context.reference'].str.replace('urn:uuid:', '')
+        df['context.reference'] = df['context.reference'].str.replace('urn:uuid:', '', regex=False)
         
     return patient_df,\
                     careplan_df,\
@@ -114,6 +116,7 @@ def extractGroup(path):
     return path.split("/")[-2]
 
 def processPatient(patient_df):
+
     patient_df.drop(columns=['text.status', 'text.div', 'extension', 'photo'], inplace=True)
     patient_df['identifier'] = next((item['value'] for item in patient_df['identifier'] if 'type' in item and 
                                     any(coding.get('code') == 'SB' for coding in item['type']['coding'])), None)
@@ -129,7 +132,7 @@ def processPatient(patient_df):
 
 def processCareplan(careplan_df):
     careplan_df['category'] = getFirst(getFirst(careplan_df['category'][0])['coding'])['display'] if 'category' in careplan_df.columns.tolist() and len(careplan_df['category']) > 0 and 'coding' in getFirst(careplan_df['category'][0]) else pd.NA
-    careplan_df['addresses'] = careplan_df['addresses'][0][0]['reference'].replace('urn:uuid:', '') if 'addresses' in careplan_df.columns.tolist() and len(careplan_df['category']) > 0 else pd.NA
+    careplan_df['addresses'] = careplan_df['addresses'][0][0]['reference'].replace('urn:uuid:', '', regex=False) if 'addresses' in careplan_df.columns.tolist() and len(careplan_df['category']) > 0 else pd.NA
     careplan_df['activity'] = [[{'display': item['detail']['code']['coding'][0]['display'], 'status': item['detail']['status']} for item in careplan_df['activity'][0]]] if 'activity' in careplan_df.columns.tolist() and len(careplan_df['activity']) > 0 else pd.NA
     return careplan_df
 
@@ -171,12 +174,12 @@ def processObservation(observation_df):
 def processProcedure(procedure_df):
     procedure_df = procedure_df.rename(columns={'code.text': 'code'})
     procedure_df.drop(columns=['code.coding'], inplace=True)
-    procedure_df['reasonReference.reference'] = procedure_df['reasonReference.reference'].str.replace('urn:uuid:', '') if 'reasonReference.reference' in procedure_df.columns.tolist() else pd.NA
+    procedure_df['reasonReference.reference'] = procedure_df['reasonReference.reference'].str.replace('urn:uuid:', '', regex = False) if 'reasonReference.reference' in procedure_df.columns.tolist() else pd.NA
     return procedure_df
 
 def main():
     file_path_list = []
-    for dirname, _, filenames in os.walk('./data'):
+    for dirname, _, filenames in os.walk('../data'):
         for filename in filenames:
             file_path_list.append((dirname, filename))
     metadata_df = pd.DataFrame(file_path_list, columns=["folder", "file"])
@@ -218,9 +221,9 @@ def main():
                                         procedure_df)
     
     # Clean and rename columns
-    patient_df, careplan_df, condition_df, diagnostic_report_df, encounter_df, immunization_df, observation_df, procedure_df = cleanAndRename(
-        patient_df, careplan_df, condition_df, diagnostic_report_df, encounter_df, immunization_df, observation_df, procedure_df
-    )
+    # patient_df, careplan_df, condition_df, diagnostic_report_df, encounter_df, immunization_df, observation_df, procedure_df = cleanAndRename(
+    #     patient_df, careplan_df, condition_df, diagnostic_report_df, encounter_df, immunization_df, observation_df, procedure_df
+    # )
     
     # Save each DataFrame to a separate CSV file
     output_folder = "./output"

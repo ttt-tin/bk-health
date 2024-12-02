@@ -24,4 +24,6 @@ info/
 # Holoclean specific files
 */debug/
 /clean_data
-/venv
+/*/venv
+/data
+/*/output
