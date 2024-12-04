@@ -177,9 +177,30 @@ def processProcedure(procedure_df):
     procedure_df['reasonReference.reference'] = procedure_df['reasonReference.reference'].str.replace('urn:uuid:', '', regex = False) if 'reasonReference.reference' in procedure_df.columns.tolist() else pd.NA
     return procedure_df
 
+def generateUnstructuredMetadata(additional_data_path, output_folder):
+    file_metadata = []
+    for dirname, _, filenames in os.walk(additional_data_path):
+        for filename in filenames:
+            file_path = os.path.join(dirname, filename)
+            file_extension = os.path.splitext(filename)[1][1:]  # Extract the file extension without the dot
+            file_metadata.append({
+                "name": filename,
+                "size": os.path.getsize(file_path),  # File size in bytes
+                "type": file_extension,             # File type (extension)
+                "category": os.path.basename(dirname),  # Folder name as category
+                "url": file_path  # Full path to the file
+            })
+    
+    # Save file metadata to CSV
+    file_metadata_df = pd.DataFrame(file_metadata)
+    file_metadata_csv_path = os.path.join(output_folder, "additional_file_metadata.csv")
+    file_metadata_df.to_csv(file_metadata_csv_path, index=False)
+    print(f"Additional file metadata has been saved to: {file_metadata_csv_path}")
+
+
 def main():
     file_path_list = []
-    for dirname, _, filenames in os.walk('../data'):
+    for dirname, _, filenames in os.walk('./data/structure'):
         for filename in filenames:
             file_path_list.append((dirname, filename))
     metadata_df = pd.DataFrame(file_path_list, columns=["folder", "file"])
@@ -237,6 +258,9 @@ def main():
     immunization_df.to_csv(os.path.join(output_folder, "immunization_data.csv"), index=False)
     observation_df.to_csv(os.path.join(output_folder, "observation_data.csv"), index=False)
     procedure_df.to_csv(os.path.join(output_folder, "procedure_data.csv"), index=False)
+    
+    additional_data_path = "./data/unstructure"
+    generateUnstructuredMetadata(additional_data_path, output_folder)
     
     print("All DataFrames have been exported as CSV files in the 'output' folder.")
 
