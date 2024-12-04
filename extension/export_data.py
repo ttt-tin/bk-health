@@ -76,14 +76,29 @@ def export_cleaned_data_with_pivot(db_url, table_name, output_file, path="/clean
     except Exception as e:
         print(f"Error occurred: {e}")
 
+
+def export_data(db_url, table_name, output_file, path="./exported_data"):
+    full_output_path = os.path.join(path, output_file)
+    os.makedirs(path, exist_ok=True)
+    engine = create_engine(db_url)
+
+    try:
+        query = f"SELECT * FROM {table_name};"
+        data_df = pd.read_sql(query, engine)
+        data_df.to_csv(full_output_path, index=False)
+        print(f"Dữ liệu từ bảng '{table_name}' đã được xuất ra file: {full_output_path}")
+    except Exception as e:
+        print(f"Lỗi khi xuất dữ liệu từ bảng '{table_name}': {e}")
+
 # Example usage:
 db_url = 'postgresql://holocleanuser:abcd1234@localhost/holo'
-table_name = 'hospital_clean'
-output_file = 'hospital_cleaned_pivoted.csv'
+table_name = 'inf_values_dom'
+output_file = 'inf_values_dom.csv'
 path = "./clean_data"  # Define the directory where you want to export the file
 
 # Show all tables in the 'public' schema first
 show_tables(db_url)
 
 # Then export the cleaned and pivoted data
-export_cleaned_data_with_pivot(db_url, table_name, output_file, path)
+# export_cleaned_data_with_pivot(db_url, table_name, output_file, path)
+export_data(db_url, table_name, output_file)

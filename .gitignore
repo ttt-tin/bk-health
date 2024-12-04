@@ -27,3 +27,5 @@ info/
 /*/venv
 /data
 /*/output
+/exported_data
+/*/testdata

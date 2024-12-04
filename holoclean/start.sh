@@ -4,7 +4,7 @@ source set_env.sh
 
 # First, run the ehr_extracttion.py script
 echo "Running ehr_extract.py"
-python examples/ehr_extract.py
+python extract/ehr_extract.py
 
 # After that, run the main script (default or provided as argument)
 script="examples/holoclean_repair_example.py"
