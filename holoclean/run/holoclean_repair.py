@@ -33,8 +33,8 @@ hc = holoclean.HoloClean(
 ).session
 
 # 2. Load training data and denial constraints.
-hc.load_data('hospital', f'/home/havanchau/Desktop/workspace/STUDY/DA/web/bk-health-web-service/holoclean/data/{sheet_name}_data_with_roles.csv')
-hc.load_dcs(f'/home/havanchau/Desktop/workspace/STUDY/DA/web/bk-health-web-service/holoclean/data/{sheet_name}_constraints.txt')
+hc.load_data('hospital', f'./holoclean/data/{sheet_name}_data.csv')
+hc.load_dcs(f'./holoclean/data/{sheet_name}_constraints.txt')
 hc.ds.set_constraints(hc.get_dcs())
 
 # 3. Detect erroneous cells using these two detectors.
