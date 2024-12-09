@@ -19,7 +19,7 @@ def processOneFile(sample_df,
 
     for index, row in sample_df.iterrows():
         tempdf=pd.json_normalize(row.entry)
-        tempdf.columns = tempdf.columns.str.replace("resource.", "")
+        tempdf.columns = tempdf.columns.str.replace("resource.", "", regex=False)
 
         if str(tempdf['resourceType'][0])=="Patient":
             tempdf = processPatient(tempdf)
@@ -80,23 +80,24 @@ def cleanAndRename(patient_df,
                     procedure_df):
     for df in [patient_df, careplan_df, condition_df, diagnostic_report_df,
                  encounter_df, immunization_df, observation_df, procedure_df]:
-        df.columns = df.columns.str.replace("resource.", "")
+        df.columns = df.columns.str.replace("resource.", "", regex=False)
+        df.columns = df.columns.str.replace(".", "_", regex=False)
         df.drop(columns=['resourceType'], inplace=True)
     
     for df in [patient_df, condition_df, diagnostic_report_df, observation_df, encounter_df]:
         df['fullUrl']= df['fullUrl'].str.replace('urn:uuid:', '')
         
     for df in [encounter_df, immunization_df]:
-        df['patient.reference'] = df['patient.reference'].str.replace('urn:uuid:', '')
+        df['patient_reference'] = df['patient_reference'].str.replace('urn:uuid:', '')
         
     for df in [immunization_df, diagnostic_report_df, observation_df, procedure_df]:
-        df['encounter.reference'] = df['encounter.reference'].str.replace('urn:uuid:', '')
+        df['encounter_reference'] = df['encounter_reference'].str.replace('urn:uuid:', '')
         
     for df in [observation_df, procedure_df, careplan_df, condition_df, diagnostic_report_df]:
-        df['subject.reference'] = df['subject.reference'].str.replace('urn:uuid:', '')
+        df['subject_reference'] = df['subject_reference'].str.replace('urn:uuid:', '')
 
     for df in [careplan_df, condition_df]:
-        df['context.reference'] = df['context.reference'].str.replace('urn:uuid:', '')
+        df['context_reference'] = df['context_reference'].str.replace('urn:uuid:', '')
         
     return patient_df,\
                     careplan_df,\
@@ -171,7 +172,7 @@ def processObservation(observation_df):
 def processProcedure(procedure_df):
     procedure_df = procedure_df.rename(columns={'code.text': 'code'})
     procedure_df.drop(columns=['code.coding'], inplace=True)
-    procedure_df['reasonReference.reference'] = procedure_df['reasonReference.reference'].str.replace('urn:uuid:', '') if 'reasonReference.reference' in procedure_df.columns.tolist() else pd.NA
+    procedure_df['reasonReference_reference'] = procedure_df['reasonReference_reference'].str.replace('urn:uuid:', '') if 'reasonReference_reference' in procedure_df.columns.tolist() else pd.NA
     return procedure_df
 
 def generateUnstructuredMetadata(additional_data_path, output_folder):
