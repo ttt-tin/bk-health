@@ -1,28 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { UploadService } from './upload.service';
+import { UploadS3Service } from './upload-s3.service';
 
 @Injectable()
 export class CronUploadService {
-  constructor(private readonly uploadService: UploadService) {}
+  constructor(private readonly uploadS3Service: UploadS3Service) {}
 
   @Cron('0 0 * * *')
   async handleCron() {
+    console.log('Run at 00h00 every day');
     const sourceFolder = process.env.SOURCE_FOLDER;
     const destFolder = process.env.DEST_FOLDER;
 
     console.log('Starting file upload to S3...');
-    await this.uploadService.uploadAllFilesInFolder(sourceFolder, destFolder);
+    await this.uploadS3Service.uploadAllFilesInFolder(sourceFolder, destFolder);
     console.log('File upload completed.');
   }
 
   @Cron('* * * * *')
   async handleMinuteCron() {
-    const sourceFolder = process.env.SOURCE_FOLDER;
-    const destFolder = process.env.DEST_FOLDER;
-
-    console.log('Starting file upload to S3...');
-    await this.uploadService.uploadAllFilesInFolder(sourceFolder, destFolder);
-    console.log('File upload completed.');
+    console.log('Run every minute');
+    
   }
 }

@@ -4,15 +4,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 @Injectable()
-export class UploadService {
+export class UploadS3Service {
   private s3: S3Client;
 
   constructor() {
     this.s3 = new S3Client({
-      region: process.env.AWS_REGION,
+      region: process.env.AWS_S3_REGION,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY,
-        secretAccessKey: process.env.AWS_SECRET_KEY,
+        accessKeyId: process.env.AWS_S3_ACCESS_KEY,
+        secretAccessKey: process.env.AWS_S3_SECRET_KEY,
       },
     });
   }
@@ -21,7 +21,7 @@ export class UploadService {
     const fileStream = fs.createReadStream(filePath);
 
     const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
+      Bucket: process.env.AWS_S3_BUCKET_NAME,
       Key: s3Key,
       Body: fileStream,
     };
