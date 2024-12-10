@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { UploadS3Service } from './upload-s3.service';
+import { KinesisService } from 'src/kinesis/kinesis.service';
 
 @Injectable()
 export class CronUploadService {
-  constructor(private readonly uploadS3Service: UploadS3Service) {}
+  constructor(private readonly uploadS3Service: UploadS3Service, private readonly kinesisService: KinesisService) { }
 
   @Cron('0 0 * * *')
   async handleCron() {
@@ -20,6 +21,6 @@ export class CronUploadService {
   @Cron('* * * * *')
   async handleMinuteCron() {
     console.log('Run every minute');
-    
+
   }
 }
