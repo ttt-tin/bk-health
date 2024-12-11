@@ -21,6 +21,14 @@ export class CronUploadService {
   @Cron('* * * * *')
   async handleMinuteCron() {
     console.log('Run every minute');
-
+  //   const userData = {
+  //     userId: 'user123',
+  //     userName: 'John Doe',
+  //     email: 'john.doe@example.com',
+  // };
+  
+  // const partitionKey = 'user123';
+  
+  // await this.kinesisService.sendDataToKinesis(userData, partitionKey);
   }
 }
