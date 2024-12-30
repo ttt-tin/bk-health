@@ -4,12 +4,6 @@
 
 script="./holoclean/run/holoclean_repair.py"
 
-if [ $# -eq 1 ]; then
-  script_arg="$1"
-else
-  echo "Usage: ./start.sh <argument>"
-  exit 1
-fi
 
 if [ -z "$VIRTUAL_ENV" ]; then
   echo "Virtual environment not active. Activating..."
@@ -26,5 +20,5 @@ else
   echo "Virtual environment is already active."
 fi
 
-echo "Launching example script $script with argument $script_arg"
-python $script $script_arg
+echo "Launching example script $script"
+python $script

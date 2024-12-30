@@ -4,6 +4,6 @@ import { PythonService } from './python.service';
 
 @Module({
   controllers: [PythonController],
-  providers: [PythonService]
+  providers: [PythonService],
 })
 export class PythonModule {}
