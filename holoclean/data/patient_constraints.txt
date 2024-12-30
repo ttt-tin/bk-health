@@ -1,2 +1,0 @@
-t1&t2&EQ(t1.gender,t2.gender)&EQ(t1.role,t2.role)&IQ(t1.name_prefix,t2.name_prefix)
-t1&t2&EQ(t1.gender,t2.gender)&IQ(t1.name_prefix,t2.name_prefix)
