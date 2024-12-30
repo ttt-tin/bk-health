@@ -7,5 +7,6 @@ import { KinesisService } from 'src/kinesis/kinesis.service';
 @Module({
   imports: [ScheduleModule.forRoot()],
   providers: [UploadS3Service, CronUploadService, KinesisService],
+  exports: [UploadS3Service]
 })
 export class UploadModule {}

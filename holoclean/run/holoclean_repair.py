@@ -1,13 +1,34 @@
 import os
 import sys
 
-# Thêm đường dẫn cho HoloClean
-sys.path.append('./holoclean/')
 import holoclean
 from detect import NullDetector, ViolationDetector
 from repair.featurize import *
 
-data_folder = './holoclean/data'
+# Thêm đường dẫn cho HoloClean
+data_folder = 'output'
+constraint_folder = 'constraint'
+
+        # 1. Setup a HoloClean session
+hc = holoclean.HoloClean(
+    db_name='web_service_db',
+    domain_thresh_1=0,
+    domain_thresh_2=0,
+    weak_label_thresh=0.99,
+    max_domain=10000,
+    cor_strength=0.6,
+    nb_cor_strength=0.8,
+    epochs=10,
+    weight_decay=0.01,
+    learning_rate=0.001,
+    threads=1,
+    batch_size=1,
+    verbose=True,
+    timeout=3*60000,
+    feature_norm=False,
+    weight_norm=False,
+    print_fw=True
+).session
 
 # Kiểm tra folder tồn tại
 if not os.path.exists(data_folder):
@@ -16,11 +37,12 @@ if not os.path.exists(data_folder):
 
 # Lặp qua các file trong folder
 for file_name in os.listdir(data_folder):
+    print(file_name)
     if file_name.endswith('_data.csv'):
         # Xác định tên file dữ liệu và constraints
         base_name = file_name.replace('_data.csv', '')
         data_file = os.path.join(data_folder, f'{base_name}_data.csv')
-        constraint_file = os.path.join(data_folder, f'{base_name}_constraints.txt')
+        constraint_file = os.path.join(constraint_folder, f'{base_name}_constraints.txt')
         
         # Kiểm tra file constraints tồn tại
         if not os.path.exists(constraint_file):
@@ -28,27 +50,6 @@ for file_name in os.listdir(data_folder):
             continue
         
         print(f"Processing dataset: {base_name}")
-        
-        # 1. Setup a HoloClean session
-        hc = holoclean.HoloClean(
-            db_name='holo',
-            domain_thresh_1=0,
-            domain_thresh_2=0,
-            weak_label_thresh=0.99,
-            max_domain=10000,
-            cor_strength=0.6,
-            nb_cor_strength=0.8,
-            epochs=10,
-            weight_decay=0.01,
-            learning_rate=0.001,
-            threads=1,
-            batch_size=1,
-            verbose=True,
-            timeout=3*60000,
-            feature_norm=False,
-            weight_norm=False,
-            print_fw=True
-        ).session
 
         # 2. Load training data and denial constraints
         hc.load_data(base_name, data_file)

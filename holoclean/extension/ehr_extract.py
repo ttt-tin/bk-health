@@ -235,7 +235,7 @@ def main():
     try:
         file_path_list = []
         csv_files = []
-        for dirname, _, filenames in os.walk('./structure'):
+        for dirname, _, filenames in os.walk('holoclean/data'):
             for filename in filenames:
                 # Add condition to filter only .json files
                 if filename.endswith('.json'):

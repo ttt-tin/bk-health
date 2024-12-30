@@ -1,4 +1,13 @@
 import boto3
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+aws_access_key_id = os.getenv('AWS_ACCESS_KEY')
+aws_secret_access_key = os.getenv('AWS_SECRET_KEY')
+glue_region = os.getenv('AWS_REGION')
+lake_region = os.getenv('AWS_REGION')
 
 # Khởi tạo các client cho Glue và Lake Formation
 glue_client = boto3.client('glue', region_name='ap-southeast-2')
