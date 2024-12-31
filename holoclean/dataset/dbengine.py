@@ -18,6 +18,9 @@ class DBengine:
     Maintains connections and executes queries.
     """
     def __init__(self, user, pwd, db, host='localhost', port=5432, pool_size=20, timeout=60000):
+
+        # host = host.strip().strip("()")
+        print('host', host)
         self.timeout = timeout
         self._pool = Pool(pool_size) if pool_size > 1 else None
         url = 'postgresql+psycopg2://{}:{}@{}:{}/{}?client_encoding=utf8'

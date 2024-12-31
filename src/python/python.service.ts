@@ -1,13 +1,14 @@
+/* eslint-disable prettier/prettier */
 import { Injectable } from '@nestjs/common';
 import { spawn } from 'child_process';
 
 @Injectable()
 export class PythonService {
-  async runPythonScript(args: string[]): Promise<string> {
+  async runPythonScript(): Promise<string> {
     return new Promise((resolve, reject) => {
       const scriptPath = '../script.py';
 
-      const process = spawn('python', [scriptPath, ...args], { shell: true });
+      const process = spawn('python', [scriptPath], { shell: true });
 
       let output = '';
       let error = '';

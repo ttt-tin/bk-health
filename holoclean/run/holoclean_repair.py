@@ -1,19 +1,17 @@
+import os
 import sys
-sys.path.append('./holoclean/')
+
 import holoclean
 from detect import NullDetector, ViolationDetector
 from repair.featurize import *
 
-if len(sys.argv) < 2:
-    print("Usage: python holoclean_repair_example.py <argument>")
-    sys.exit(1)
+# Thêm đường dẫn cho HoloClean
+data_folder = 'output'
+constraint_folder = 'constraint'
 
-sheet_name = sys.argv[1]
-
-
-# 1. Setup a HoloClean session.
+        # 1. Setup a HoloClean session
 hc = holoclean.HoloClean(
-    db_name='holo',
+    db_name='web_service_db',
     domain_thresh_1=0,
     domain_thresh_2=0,
     weak_label_thresh=0.99,
@@ -32,28 +30,50 @@ hc = holoclean.HoloClean(
     print_fw=True
 ).session
 
-# 2. Load training data and denial constraints.
-hc.load_data('hospital', f'./holoclean/data/{sheet_name}_data.csv')
-hc.load_dcs(f'./holoclean/data/{sheet_name}_constraints.txt')
-hc.ds.set_constraints(hc.get_dcs())
+# Kiểm tra folder tồn tại
+if not os.path.exists(data_folder):
+    print(f"Error: Data folder '{data_folder}' does not exist.")
+    sys.exit(1)
 
-# 3. Detect erroneous cells using these two detectors.
-detectors = [NullDetector(), ViolationDetector()]
-hc.detect_errors(detectors)
+# Lặp qua các file trong folder
+for file_name in os.listdir(data_folder):
+    print(file_name)
+    if file_name.endswith('_data.csv'):
+        # Xác định tên file dữ liệu và constraints
+        base_name = file_name.replace('_data.csv', '')
+        data_file = os.path.join(data_folder, f'{base_name}_data.csv')
+        constraint_file = os.path.join(constraint_folder, f'{base_name}_constraints.txt')
+        
+        # Kiểm tra file constraints tồn tại
+        if not os.path.exists(constraint_file):
+            print(f"Warning: Constraint file for '{base_name}' not found. Skipping.")
+            continue
+        
+        print(f"Processing dataset: {base_name}")
 
-# 4. Repair errors utilizing the defined features.
-hc.setup_domain()
-featurizers = [
-    InitAttrFeaturizer(),
-    OccurAttrFeaturizer(),
-    FreqFeaturizer(),
-    ConstraintFeaturizer(),
-]
+        # 2. Load training data and denial constraints
+        hc.load_data(base_name, data_file)
+        hc.load_dcs(constraint_file)
+        hc.ds.set_constraints(hc.get_dcs())
 
-hc.repair_errors(featurizers)
+        # 3. Detect erroneous cells using these two detectors
+        detectors = [NullDetector(), ViolationDetector()]
+        hc.detect_errors(detectors)
 
-# 5. Evaluate the correctness of the results.
-# hc.evaluate(fpath='../testdata/inf_values_dom.csv',
-#             tid_col='tid',
-#             attr_col='attribute',
-#             val_col='correct_val')
+        # 4. Repair errors utilizing the defined features
+        hc.setup_domain()
+        featurizers = [
+            InitAttrFeaturizer(),
+            OccurAttrFeaturizer(),
+            FreqFeaturizer(),
+            ConstraintFeaturizer(),
+        ]
+        hc.repair_errors(featurizers)
+
+        # 5. Evaluate the correctness of the results (optional)
+        # hc.evaluate(fpath='../testdata/inf_values_dom.csv',
+        #             tid_col='tid',
+        #             attr_col='attribute',
+        #             val_col='correct_val')
+
+        print(f"Finished processing dataset: {base_name}")
