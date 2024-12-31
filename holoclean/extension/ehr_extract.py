@@ -4,6 +4,10 @@ import json
 import os
 from tqdm import tqdm
 import shutil
+from upload import upload_folder_to_s3
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def getFirst(array):
     return array[0] if len(array) > 0 else pd.NA
@@ -311,6 +315,10 @@ def main():
         # generateUnstructuredMetadata(additional_data_path, output_folder)
         
         print("All DataFrames have been exported as CSV files in the 'output' folder.")
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+        region_name=os.getenv('AWS_REGION')
+        upload_folder_to_s3(output_folder, 'bk-health-landing-bucket', aws_access_key_id, aws_secret_access_key, region_name)
     except Exception as e:
         print(f"Error processing: {e}")
 

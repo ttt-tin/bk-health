@@ -6,6 +6,7 @@ import boto3
 import psycopg2
 from psycopg2 import sql
 from dotenv import load_dotenv
+from upload import upload_folder_to_s3, clear_output_folder
 
 load_dotenv()
 
@@ -158,24 +159,25 @@ def upload_processed_data():
 # Main pipeline
 def pipeline():
     while True:
-        # print("Fetching unprocessed files...")
-        # unprocessed_files = list_unprocessed_files()
-        # if not unprocessed_files:
-        #     print("No new files to process. Waiting...")
-        #     time.sleep(POLLING_INTERVAL)
-        #     continue
+        clear_output_folder('output')
+        print("Fetching unprocessed files...")
+        unprocessed_files = list_unprocessed_files()
+        if not unprocessed_files:
+            print("No new files to process. Waiting...")
+            time.sleep(POLLING_INTERVAL)
+            continue
         
-        # # Process files in batches
-        # batch = unprocessed_files[:BATCH_SIZE]
-        # print(f"Processing batch: {batch}")
-        # local_files = download_batch(batch)
+        # Process files in batches
+        batch = unprocessed_files[:BATCH_SIZE]
+        print(f"Processing batch: {batch}")
+        local_files = download_batch(batch)
 
-        # # Mark files as processed (before running extract to avoid duplication)
-        # for file_key in batch:
-        #     mark_file_as_processed(file_key)
+        # Mark files as processed (before running extract to avoid duplication)
+        for file_key in batch:
+            mark_file_as_processed(file_key)
 
-        # # Run extract.py
-        # run_extraction()
+        # Run extract.py
+        run_extraction()
 
         # Run Holoclean
         run_holoclean()
