@@ -8,22 +8,24 @@ import { KinesisModule } from './kinesis/kinesis.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MappingModule } from './mapping/mapping.module';
 import * as dotenv from 'dotenv';
+import { AthenaModule } from './athena/athena..module';
+import { HistoryModule } from './history/history.module';
 dotenv.config();
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'web-service-db.cjgiasm6wf6c.ap-southeast-2.rds.amazonaws.com',
+      host: process.env.DB_HOST,
       port: 5432,
       username: 'postgres',
       password: 'bkhealth1703',
-      database: 'web_service_db',
+      database: 'web_service_db_2',
       entities: ['dist/**/**/*.entity.js'],
       synchronize: true,
       ssl: { rejectUnauthorized: false },
     }),
-    ConstraintModule, PythonModule, UploadModule, KinesisModule, MappingModule],
+    ConstraintModule, PythonModule, UploadModule, KinesisModule, MappingModule, AthenaModule, HistoryModule],
   controllers: [AppController],
   providers: [AppService],
 })

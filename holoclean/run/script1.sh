@@ -2,8 +2,8 @@
 # Set & move to home directory
 . ./holoclean/set_env.sh
 
-script="./holoclean/extension/pipe.py"
-# script="./holoclean/run/holoclean_repair.py"
+# script="./holoclean/extension/pipe.py"
+script="./holoclean/run/holoclean_repair.py"
 
 
 if [ -z "$VIRTUAL_ENV" ]; then

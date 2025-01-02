@@ -1,0 +1,52 @@
+{
+  "tables": [
+    {
+      "source_table": "hospital",
+      "mapping": {
+        "ProviderNumber": "ProviderNumber",
+        "HospitalName": "HospitalName",
+        "Address1": "Address1",
+        "Address2": "Address2",
+        "Address3": "Address3",
+        "City": "City",
+        "State": "State",
+        "ZipCode": "ZipCode",
+        "CountyName": "CountyName",
+        "PhoneNumber": "PhoneNumber",
+        "HospitalType": "HospitalType",
+        "HospitalOwner": "HospitalOwner",
+        "EmergencyService": "EmergencyService",
+        "Condition": "Condition",
+        "MeasureCode": "MeasureCode",
+        "MeasureName": "MeasureName",
+        "Score": "Score",
+        "Sample": "Sample",
+        "Stateavg": "Stateavg"
+      }
+    },
+    {
+      "source_table": "patient",
+      "mapping": {
+        "gender": "gender",
+        "birthDate": "birthDate",
+        "maritalStatus": "maritalStatus",
+        "multipleBirthBoolean": "multipleBirthBoolean",
+        "addressState": "address_state",
+        "id": "id",
+        "addressCity": "address_city",
+        "fullUrl": "fullUrl",
+        "deceasedDateTime": "deceasedDateTime",
+        "addressLine": "address_line",
+        "addressPostalCode": "address_postalCode",
+        "telecomSystem": "telecom_system",
+        "telecomValue": "telecom_value",
+        "telecomUse": "telecom_use",
+        "nameUse": "name_use",
+        "nameFamily": "name_family",
+        "nameGiven": "name_given",
+        "namePrefix": "name_prefix"
+      }
+    }
+  ],
+  "database": "public"
+}

@@ -8,8 +8,21 @@ export class MappingController {
   constructor(private readonly mappingService: MappingService) {}
 
   @Post()
-  create(@Body() createMappingDtos: CreateMappingDto[]) {
-    return this.mappingService.create(createMappingDtos);
+  async create(@Body() createMappingDtos: CreateMappingDto[]) {
+    try {
+      console.log(createMappingDtos)
+      const results = await this.mappingService.create(createMappingDtos);
+      return {
+        data: results,
+        success: true
+      }
+    }
+    catch (error) {
+      return {
+        message: error.message,
+        success: false
+      }
+    }
   }
 
   @Get()

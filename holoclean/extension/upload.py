@@ -1,57 +1,24 @@
-import os
-import boto3
-from botocore.exceptions import NoCredentialsError
-from datetime import datetime
 import shutil
+import os
+import requests
 
-def upload_folder_to_s3(folder_path, bucket_name, aws_access_key=None, aws_secret_key=None, region_name='us-east-1'):
-    """
-    Upload all files in a folder to an S3 bucket with partitioned paths (yyyy/mm/dd/hh).
+def upload_file_to_nestjs_api(file_path, bucket_name):
+    url = 'http://localhost:3000/upload'  # Địa chỉ API của bạn
+    params = {
+        'folderPath': file_path,
+        'bucketName': bucket_name,
+    }
+    # Gửi yêu cầu GET với các tham số
+    response = requests.get(url, params=params)
 
-    :param folder_path: Path to the folder containing files to upload
-    :param bucket_name: Bucket name
-    :param base_path: Base path in S3 bucket (default: 'uploads')
-    :param aws_access_key: AWS access key ID (optional)
-    :param aws_secret_key: AWS secret access key (optional)
-    :param region_name: AWS region name
-    :return: List of uploaded files and their paths in S3
-    """
-    if aws_access_key and aws_secret_key:
-        s3_client = boto3.client(
-            's3',
-            aws_access_key_id=aws_access_key,
-            aws_secret_access_key=aws_secret_key,
-            region_name=region_name
-        )
+    print(response)
+
+    # Kiểm tra xem có lỗi không
+    if response.status_code == 200:
+        print("Files uploaded successfully.")
     else:
-        s3_client = boto3.client('s3', region_name=region_name)
+        print(f"Error: {response.status_code} - {response.text}")
 
-    uploaded_files = []
-
-    now = datetime.utcnow()
-    partition_path = now.strftime("%Y/%m/%d/%H")
-
-    try:
-        for root, _, files in os.walk(folder_path):
-            for file_name in files:
-                file_path = os.path.join(root, file_name)
-                object_name = f"{partition_path}/{file_name}"
-
-                s3_client.upload_file(file_path, bucket_name, object_name)
-                uploaded_files.append(object_name)
-                print(f"Uploaded '{file_name}' to S3 bucket '{bucket_name}' as '{object_name}'.")
-
-        return uploaded_files
-
-    except FileNotFoundError:
-        print(f"The folder '{folder_path}' was not found.")
-        return []
-    except NoCredentialsError:
-        print("Credentials not available.")
-        return []
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return []
 
 def clear_output_folder(folder_path):
     """

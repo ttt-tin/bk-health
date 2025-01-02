@@ -15,6 +15,13 @@ async function bootstrap() {
   //   credentials: true,
   // }));
 
+  app.enableCors({
+    origin: '*', // Cho phép tất cả các nguồn
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Cho phép các phương thức này
+    allowedHeaders: 'Content-Type, Authorization', // Các header cho phép
+    credentials: true, // Cho phép cookie cross-origin (nếu cần)
+  });
+
   console.log(process.env.DB_HOST)
 
   // Use the custom Socket.IO adapter to handle WebSocket CORS

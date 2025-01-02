@@ -52,7 +52,7 @@ def export_data(db_url, table_name, output_file, path="./exported_data"):
     except Exception as e:
         print(f"Lỗi khi xuất dữ liệu từ bảng '{table_name}': {e}")
 
-db_url = 'postgresql://holocleanuser:abcd1234@localhost/holo'
+db_url = 'postgresql://postgres:bkhealth1703@web-service-db-2.cjgiasm6wf6c.ap-southeast-2.rds.amazonaws.com/web_service_db_2'
 table_name = 'hospital_repaired'
 output_file = 'hospital_repaired.csv'
 path = "./clean_data"

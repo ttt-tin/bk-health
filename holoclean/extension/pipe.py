@@ -6,7 +6,7 @@ import boto3
 import psycopg2
 from psycopg2 import sql
 from dotenv import load_dotenv
-from upload import upload_folder_to_s3, clear_output_folder
+from upload import upload_file_to_nestjs_api, clear_output_folder
 
 load_dotenv()
 
@@ -17,11 +17,11 @@ s3_client = boto3.client(
     aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
     region_name=os.getenv('AWS_REGION')
 )
-BUCKET_NAME = 'bk-health-raw-bucket'
+BUCKET_NAME = 'bk-health-landing-bucket'
 POLLING_INTERVAL = 30
 BATCH_SIZE = 10
 EXTRACTION_SCRIPT = "holoclean/extension/ehr_extract.py"
-HOLOCLEAN_SCRIPT = "holoclean/run/script.sh"
+HOLOCLEAN_SCRIPT = "holoclean/run/script1.sh"
 
 # PostgreSQL Configuration
 DB_CONFIG = {
@@ -165,7 +165,7 @@ def pipeline():
         if not unprocessed_files:
             print("No new files to process. Waiting...")
             time.sleep(POLLING_INTERVAL)
-            continue
+            return
         
         # Process files in batches
         batch = unprocessed_files[:BATCH_SIZE]

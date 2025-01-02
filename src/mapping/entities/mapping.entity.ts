@@ -11,6 +11,10 @@ export class MappingEntity {
   dbName: string;
 
   @IsString()
+  @Column({ name: 'db_table', type: 'varchar', length: 255, nullable: true }) 
+  dbTable: string;
+
+  @IsString()
   @Column({ name: 'db_column', type: 'varchar', length: 255, nullable: true }) 
   dbColumn: string;
 

@@ -7,8 +7,10 @@ export class PythonController {
 
   @Get('run')
   async runPython(
-    @Query('arg') arg: string, 
   ): Promise<string> {
-    return this.pythonService.runShellScript(arg);
+    const result = await this.pythonService.runShellScript();
+
+    console.log('Cleaning completed.')
+    return result;
   }
 }

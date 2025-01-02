@@ -9,7 +9,7 @@ export class ConstraintService {
       const decodedConstraintCondition = decodeURIComponent(constraintCondition);
 
       const fileName = `${tableName}_constraints.txt`;
-      const filePath = path.join(__dirname, '../../holoclean/constraints', fileName);
+      const filePath = path.join(__dirname, 'constraint', fileName);
 
       const content = `${decodedConstraintCondition}\n`;
 

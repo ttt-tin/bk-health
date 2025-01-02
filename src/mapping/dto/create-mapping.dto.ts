@@ -7,7 +7,11 @@ export class CreateMappingDto {
 
   @IsString()
   @IsOptional()
-  dbCloumn?: string;
+  dbTable?: string;
+
+  @IsString()
+  @IsOptional()
+  dbColumn?: string;
 
   @IsString()
   @IsOptional()

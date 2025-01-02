@@ -11,7 +11,7 @@ export class CronUploadService {
   async handleCron() {
     console.log('Run at 00h00 every day');
     const sourceFolder = process.env.SOURCE_FOLDER;
-    const destFolder = process.env.DEST_FOLDER;
+    const destFolder = '';
 
     console.log('Starting file upload to S3...');
     await this.uploadS3Service.uploadAllFilesInFolder(sourceFolder, destFolder);
@@ -20,7 +20,7 @@ export class CronUploadService {
 
   @Cron('* * * * *')
   async handleMinuteCron() {
-    console.log('Run every minute');
+    // console.log('Run every minute');
   //   const userData = {
   //     userId: 'user123',
   //     userName: 'John Doe',
