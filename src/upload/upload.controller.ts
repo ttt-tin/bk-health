@@ -31,7 +31,7 @@ export class UploadController {
   ): Promise<any> {
     try {
       const bucketName = process.env.AWS_S3_BUCKET_NAME;
-      const folderPath = 'unstructured';  // Define folder path for S3
+      const folderPath = 'unstructure';  // Define folder path for S3
       if (!file) {
         throw new Error('File upload failed, no file received.');
       }
