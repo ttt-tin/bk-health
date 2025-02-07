@@ -336,7 +336,7 @@ def main():
         mapping_json_path = "mapping.json"
         map_all_tables_from_folder(input_folder_path, mapping_json_path)
 
-        upload_file_to_nestjs_api('./standard', 'bk-health-raw-bucket')
+        upload_file_to_nestjs_api('./standard', 'bk-health-bucket-raw')
 
     except Exception as e:
         print(f"Error processing: {e}")

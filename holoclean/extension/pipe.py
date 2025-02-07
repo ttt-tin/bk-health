@@ -17,7 +17,7 @@ s3_client = boto3.client(
     aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
     region_name=os.getenv('AWS_REGION')
 )
-BUCKET_NAME = 'bk-health-landing-bucket'
+BUCKET_NAME = 'bk-health-bucket-landing'
 POLLING_INTERVAL = 30
 BATCH_SIZE = 10
 EXTRACTION_SCRIPT = "holoclean/extension/ehr_extract.py"

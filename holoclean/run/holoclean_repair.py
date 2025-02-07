@@ -146,7 +146,7 @@ def generate_create_table_query_from_db(prefix, table_name, table_structure):
 
             columns_definitions.append(f"`{column_name}` {sql_type}")
 
-        create_table_query = f"CREATE TABLE IF NOT EXISTS `{prefix}`.`{table_name}` (\n  " + ",\n  ".join(columns_definitions) + "\n) LOCATION 's3://bk-health-trusted-bucket/' TBLPROPERTIES ('table_type' = 'ICEBERG', 'format' = 'parquet');"
+        create_table_query = f"CREATE TABLE IF NOT EXISTS `{prefix}`.`{table_name}` (\n  " + ",\n  ".join(columns_definitions) + "\n) LOCATION 's3://bk-health-bucket-trusted/' TBLPROPERTIES ('table_type' = 'ICEBERG', 'format' = 'parquet');"
         return create_table_query
     except Exception as e:
         print(f"Lỗi khi tạo câu lệnh CREATE TABLE: {e}")
