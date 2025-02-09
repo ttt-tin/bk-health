@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import {
   AthenaClient,
   ListDataCatalogsCommand,
   ListDatabasesCommand,
   ListTableMetadataCommand,
+  StartQueryExecutionCommand,
   GetTableMetadataCommand,
-} from '@aws-sdk/client-athena';
+} from "@aws-sdk/client-athena";
 
 @Injectable()
 export class AthenaService {
@@ -30,19 +31,21 @@ export class AthenaService {
         []
       );
     } catch (err) {
-      console.error('Error fetching catalogs:', err);
-      throw new Error(err.message || 'Failed to fetch catalogs.');
+      console.error("Error fetching catalogs:", err);
+      throw new Error(err.message || "Failed to fetch catalogs.");
     }
   }
 
   async fetchDatabases(selectedCatalog: string): Promise<string[]> {
     try {
-      const command = new ListDatabasesCommand({ CatalogName: selectedCatalog });
+      const command = new ListDatabasesCommand({
+        CatalogName: selectedCatalog,
+      });
       const response = await this.athenaClient.send(command);
       return response.DatabaseList?.map((db) => db.Name!) || [];
     } catch (err) {
-      console.error('Error fetching databases:', err);
-      throw new Error(err.message || 'Failed to fetch databases.');
+      console.error("Error fetching databases:", err);
+      throw new Error(err.message || "Failed to fetch databases.");
     }
   }
 
@@ -58,8 +61,8 @@ export class AthenaService {
       const response = await this.athenaClient.send(command);
       return response.TableMetadataList?.map((table) => table.Name!) || [];
     } catch (err) {
-      console.error('Error fetching tables:', err);
-      throw new Error(err.message || 'Failed to fetch tables.');
+      console.error("Error fetching tables:", err);
+      throw new Error(err.message || "Failed to fetch tables.");
     }
   }
 
@@ -77,8 +80,26 @@ export class AthenaService {
       const response = await this.athenaClient.send(command);
       return response.TableMetadata?.Columns || [];
     } catch (err) {
-      console.error('Error fetching schema:', err);
-      throw new Error(err.message || 'Failed to fetch schema.');
+      console.error("Error fetching schema:", err);
+      throw new Error(err.message || "Failed to fetch schema.");
+    }
+  }
+
+  async executeQuery(query: string): Promise<string> {
+    try {
+      const command = new StartQueryExecutionCommand({
+        QueryString: query,
+        QueryExecutionContext: { Database: "hospital_data" },
+        ResultConfiguration: {
+          OutputLocation: `s3://${process.env.AWS_ATHENA_OUTPUT_BUCKET}/athena-results/`,
+        },
+      });
+
+      const response = await this.athenaClient.send(command);
+      return response.QueryExecutionId!; // Trả về QueryExecutionId để theo dõi
+    } catch (err) {
+      console.error("Error executing Athena query:", err);
+      throw new Error(err.message || "Failed to execute query.");
     }
   }
 }
