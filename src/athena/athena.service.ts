@@ -7,9 +7,11 @@ import {
   StartQueryExecutionCommand,
   GetTableMetadataCommand,
 } from "@aws-sdk/client-athena";
+import { v4 as uuidv4 } from "uuid";
 
 @Injectable()
 export class AthenaService {
+  private readonly DATABASE_NAME = "hospital_data";
   private readonly athenaClient: AthenaClient;
 
   constructor() {
@@ -101,5 +103,33 @@ export class AthenaService {
       console.error("Error executing Athena query:", err);
       throw new Error(err.message || "Failed to execute query.");
     }
+  }
+
+  async insertTableMetadata(
+    tableName: string,
+    columnName: string,
+    primaryKey: string,
+  ): Promise<void> {
+    const generatedId = uuidv4();
+
+    const query = `
+      INSERT INTO ${this.DATABASE_NAME}.tables (id, table_name, column_name, primary_key)
+      VALUES ('${generatedId}', '${tableName}', '${columnName}', '${primaryKey}');
+    `;
+    await this.executeQuery(query);
+  }
+
+  async updateTableMetadata(
+    id: string,
+    tableName: string,
+    columnName: string,
+    primaryKey: string,
+  ): Promise<void> {
+    const query = `
+      UPDATE tables
+      SET table_name = '${tableName}', column_name = '${columnName}', primary_key = '${primaryKey}'
+      WHERE id = '${id}';
+    `;
+    await this.executeQuery(query);
   }
 }

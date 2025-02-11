@@ -1,11 +1,50 @@
-import { Controller, Get, Query, HttpException, HttpStatus } from '@nestjs/common';
-import { AthenaService } from './athena.service';
+import {
+  Controller,
+  Get,
+  Query,
+  HttpException,
+  HttpStatus,
+  Body,
+  Post,
+  Put,
+} from "@nestjs/common";
+import { AthenaService } from "./athena.service";
 
-@Controller('athena')
+@Controller("athena")
 export class AthenaController {
   constructor(private readonly athenaService: AthenaService) {}
 
-  @Get('catalogs')
+  @Post("insert")
+  async insertTableMetadata(
+    @Body("table_name") tableName: string,
+    @Body("column_name") columnName: string,
+    @Body("primary_key") primaryKey: string,
+  ) {
+    await this.athenaService.insertTableMetadata(
+      tableName,
+      columnName,
+      primaryKey,
+    );
+    return { message: "Data inserted successfully" };
+  }
+
+  @Put("update")
+  async updateTableMetadata(
+    @Body("id") id: string,
+    @Body("table_name") tableName: string,
+    @Body("column_name") columnName: string,
+    @Body("primary_key") primaryKey: string,
+  ) {
+    await this.athenaService.updateTableMetadata(
+      id,
+      tableName,
+      columnName,
+      primaryKey,
+    );
+    return { message: "Data updated successfully" };
+  }
+
+  @Get("catalogs")
   async getCatalogs() {
     try {
       return await this.athenaService.fetchCatalogs();
@@ -14,10 +53,10 @@ export class AthenaController {
     }
   }
 
-  @Get('databases')
-  async getDatabases(@Query('catalog') catalog: string) {
+  @Get("databases")
+  async getDatabases(@Query("catalog") catalog: string) {
     if (!catalog) {
-      throw new HttpException('Catalog is required', HttpStatus.BAD_REQUEST);
+      throw new HttpException("Catalog is required", HttpStatus.BAD_REQUEST);
     }
     try {
       return await this.athenaService.fetchDatabases(catalog);
@@ -26,13 +65,16 @@ export class AthenaController {
     }
   }
 
-  @Get('tables')
+  @Get("tables")
   async getTables(
-    @Query('catalog') catalog: string,
-    @Query('database') database: string,
+    @Query("catalog") catalog: string,
+    @Query("database") database: string,
   ) {
     if (!catalog || !database) {
-      throw new HttpException('Catalog and Database are required', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        "Catalog and Database are required",
+        HttpStatus.BAD_REQUEST,
+      );
     }
     try {
       return await this.athenaService.fetchTables(catalog, database);
@@ -41,15 +83,15 @@ export class AthenaController {
     }
   }
 
-  @Get('schema')
+  @Get("schema")
   async getSchema(
-    @Query('catalog') catalog: string,
-    @Query('database') database: string,
-    @Query('table') table: string,
+    @Query("catalog") catalog: string,
+    @Query("database") database: string,
+    @Query("table") table: string,
   ) {
     if (!catalog || !database || !table) {
       throw new HttpException(
-        'Catalog, Database, and Table are required',
+        "Catalog, Database, and Table are required",
         HttpStatus.BAD_REQUEST,
       );
     }
