@@ -6,6 +6,7 @@ import {
   ListTableMetadataCommand,
   StartQueryExecutionCommand,
   GetTableMetadataCommand,
+  GetQueryResultsCommand,
 } from "@aws-sdk/client-athena";
 import { v4 as uuidv4 } from "uuid";
 
@@ -105,31 +106,83 @@ export class AthenaService {
     }
   }
 
-  async insertTableMetadata(
-    tableName: string,
-    columnName: string,
-    primaryKey: string,
-  ): Promise<void> {
-    const generatedId = uuidv4();
-
-    const query = `
-      INSERT INTO ${this.DATABASE_NAME}.tables (id, table_name, column_name, primary_key)
-      VALUES ('${generatedId}', '${tableName}', '${columnName}', '${primaryKey}');
-    `;
-    await this.executeQuery(query);
-  }
-
   async updateTableMetadata(
     id: string,
     tableName: string,
     columnName: string,
     primaryKey: string,
   ): Promise<void> {
-    const query = `
-      UPDATE tables
-      SET table_name = '${tableName}', column_name = '${columnName}', primary_key = '${primaryKey}'
-      WHERE id = '${id}';
-    `;
-    await this.executeQuery(query);
+    if (id) {
+      const generatedId = uuidv4();
+
+      const query = `
+        INSERT INTO ${this.DATABASE_NAME}.tables (id, table_name, column_name, primary_key)
+        VALUES ('${generatedId}', '${tableName}', '${columnName}', '${primaryKey}');
+      `;
+      await this.executeQuery(query);
+    } else {
+      const query = `
+        UPDATE tables
+        SET table_name = '${tableName}', column_name = '${columnName}', primary_key = '${primaryKey}'
+        WHERE id = '${id}';
+      `;
+      await this.executeQuery(query);
+    }
+  }
+
+  async fetchData(
+    catalog: string,
+    database: string,
+    table: string,
+  ): Promise<any> {
+    const command = new StartQueryExecutionCommand({
+      QueryString: `SELECT * FROM ${table} LIMIT 10`,
+      QueryExecutionContext: {
+        Database: database,
+      },
+      ResultConfiguration: {
+        OutputLocation: `s3://${process.env.AWS_ATHENA_OUTPUT_BUCKET}`,
+      },
+    });
+
+    const executionResponse = await this.athenaClient.send(command);
+    const queryExecutionId = executionResponse.QueryExecutionId;
+
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    const getResultsCommand = new GetQueryResultsCommand({
+      QueryExecutionId: queryExecutionId,
+    });
+    const results = await this.athenaClient.send(getResultsCommand);
+
+    return this.transformAthenaResults(results.ResultSet?.Rows || []);
+  }
+
+  transformAthenaResults(rawResults: any[]): any[] {
+    if (!rawResults || rawResults.length === 0) {
+      return [];
+    }
+
+    // Giả sử hàng đầu tiên là header
+    var headerRow = rawResults[0].Data;
+    var headers = headerRow.map(function (item: any) {
+      return item.VarCharValue;
+    });
+
+    // Xử lý các hàng còn lại
+    var rows = [];
+    for (var i = 1; i < rawResults.length; i++) {
+      var rowData = rawResults[i].Data;
+      var rowObj: any = {};
+      for (var j = 0; j < headers.length; j++) {
+        // Nếu không có dữ liệu cho cột nào đó, gán null
+        rowObj[headers[j]] =
+          rowData[j] && rowData[j].VarCharValue !== undefined
+            ? rowData[j].VarCharValue
+            : null;
+      }
+      rows.push(rowObj);
+    }
+    return rows;
   }
 }

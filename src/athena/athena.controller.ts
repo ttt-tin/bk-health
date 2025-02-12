@@ -12,24 +12,10 @@ import { AthenaService } from "./athena.service";
 
 @Controller("athena")
 export class AthenaController {
-  constructor(private readonly athenaService: AthenaService) {}
+  constructor(private readonly athenaService: AthenaService) { }
 
-  @Post("insert")
-  async insertTableMetadata(
-    @Body("table_name") tableName: string,
-    @Body("column_name") columnName: string,
-    @Body("primary_key") primaryKey: string,
-  ) {
-    await this.athenaService.insertTableMetadata(
-      tableName,
-      columnName,
-      primaryKey,
-    );
-    return { message: "Data inserted successfully" };
-  }
-
-  @Put("update")
-  async updateTableMetadata(
+  @Post("create")
+  async createTableMetadata(
     @Body("id") id: string,
     @Body("table_name") tableName: string,
     @Body("column_name") columnName: string,
@@ -97,6 +83,25 @@ export class AthenaController {
     }
     try {
       return await this.athenaService.fetchSchema(catalog, database, table);
+    } catch (err) {
+      throw new HttpException(err.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Get("data")
+  async getData(
+    @Query("catalog") catalog: string,
+    @Query("database") database: string,
+    @Query("table") table: string,
+  ) {
+    if (!catalog || !database || !table) {
+      throw new HttpException(
+        "Catalog, Database, and Table are required",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    try {
+      return await this.athenaService.fetchData(catalog, database, table);
     } catch (err) {
       throw new HttpException(err.message, HttpStatus.BAD_REQUEST);
     }
