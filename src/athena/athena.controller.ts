@@ -12,21 +12,15 @@ import { AthenaService } from "./athena.service";
 
 @Controller("athena")
 export class AthenaController {
-  constructor(private readonly athenaService: AthenaService) { }
+  constructor(private readonly athenaService: AthenaService) {}
 
   @Post("create")
   async createTableMetadata(
     @Body("id") id: string,
     @Body("table_name") tableName: string,
     @Body("column_name") columnName: string,
-    @Body("primary_key") primaryKey: string,
   ) {
-    await this.athenaService.updateTableMetadata(
-      id,
-      tableName,
-      columnName,
-      primaryKey,
-    );
+    await this.athenaService.updateTableMetadata(id, tableName, columnName);
     return { message: "Data updated successfully" };
   }
 
