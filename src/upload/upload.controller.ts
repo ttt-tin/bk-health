@@ -115,7 +115,7 @@ export class UploadController {
           );
         }
 
-        patientId = result[0].patient_id;
+        patientId = result[0].id;
       }
 
       // Insert into user_files
