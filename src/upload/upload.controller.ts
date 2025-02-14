@@ -18,7 +18,7 @@ export class UploadController {
   constructor(
     private readonly uploadService: UploadS3Service,
     private readonly athenaService: AthenaService,
-  ) { }
+  ) {}
 
   @Get()
   async runUpload(
@@ -64,54 +64,72 @@ export class UploadController {
   @UseInterceptors(FileInterceptor("file"))
   async uploadFile(
     @UploadedFile() file: Express.Multer.File,
-    @Body("user_id") userId: string,
+    @Body()
+    requestData: { patient_id?: string; volume: string; [key: string]: any },
   ): Promise<any> {
     try {
       if (!file) throw new Error("File upload failed, no file received.");
-      if (!userId) throw new Error("User ID is required.");
+      if (!requestData || !requestData.volume)
+        throw new Error("Volume is required to determine the upload folder.");
 
       const bucketName = process.env.AWS_S3_BUCKET_NAME;
+      const folderPath = `unstructure/${requestData.volume}`; // Use volume as folder
 
-      console.log("bucketName", bucketName);
-      const folderPath = "unstructure"; // Định nghĩa folder trên S3
-
-      // ✅ 1. Upload file lên S3
-      const fileExt = file.originalname.split(".").pop(); // Lấy phần mở rộng
-      const newFileName = `${Date.now()}-${uuidv4()}.${fileExt}`; // Tạo tên mới
-
-      console.log("New file name:", newFileName);
+      const fileExt = file.originalname.split(".").pop();
+      const newFileName = `${Date.now()}-${uuidv4()}.${fileExt}`;
 
       const fileKey = await this.uploadService.uploadFileForTextract(
-        { ...file, originalname: newFileName }, // Gửi file với tên mới
+        { ...file, originalname: newFileName },
         bucketName,
         folderPath,
       );
-      
+
       const filePath = `s3://${bucketName}/${fileKey}`;
-      const fileId = fileKey.split("/").pop(); // Lấy tên file làm ID (có thể thay đổi)
-
-      // ✅ 2. Insert vào bảng `user_files`
       const createDate = new Date().toISOString();
-      const insertUserFileQuery = `
-        INSERT INTO user_files (user_id, file_id, create_date)
-        VALUES ('${userId}', '${fileId}', '${createDate}');
-      `;
-      await this.athenaService.executeQuery(insertUserFileQuery);
 
-      // ✅ 3. Insert vào bảng `medical_analysis`
-      const insertMedicalAnalysisQuery = `
-        INSERT INTO user_files (user_id, file_id, create_date)
-        VALUES (
-          '${userId}', 
-          '${filePath}', 
-          '${createDate}'
+      let patientId = requestData.patient_id;
+
+      // If patient_id is missing, find it from other attributes
+      if (!patientId) {
+        const possibleKeys = Object.keys(requestData).filter(
+          (key) => key !== "volume" && key !== "patient_id" && requestData[key],
         );
+
+        if (possibleKeys.length === 0) {
+          throw new Error("No valid attributes found to determine patient_id.");
+        }
+
+        // Construct WHERE condition to find patient_id
+        const whereCondition = possibleKeys
+          .map((key) => `${key} = '${requestData[key]}'`)
+          .join(" OR ");
+
+        const findPatientQuery = `
+        SELECT id FROM patient_repaired WHERE ${whereCondition} LIMIT 1;
       `;
-      await this.athenaService.executeQuery(insertMedicalAnalysisQuery);
+
+        const result = await this.athenaService.executeQuery(findPatientQuery);
+        if (result.length === 0) {
+          throw new Error(
+            "No matching patient_id found for provided attributes.",
+          );
+        }
+
+        patientId = result[0].patient_id;
+      }
+
+      // Insert into user_files
+      const insertQuery = `
+      INSERT INTO user_files (patient_id, file_path, create_date)
+      VALUES ('${patientId}', '${filePath}', '${createDate}');
+    `;
+
+      await this.athenaService.executeQuery(insertQuery);
 
       return {
         message: "File uploaded and information saved successfully",
         filePath,
+        patientId,
       };
     } catch (error) {
       return { message: error.message };

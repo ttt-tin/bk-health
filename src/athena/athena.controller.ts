@@ -7,6 +7,7 @@ import {
   Body,
   Post,
   Put,
+  BadRequestException,
 } from "@nestjs/common";
 import { AthenaService } from "./athena.service";
 
@@ -22,6 +23,20 @@ export class AthenaController {
   ) {
     await this.athenaService.updateTableMetadata(id, tableName, columnName);
     return { message: "Data updated successfully" };
+  }
+
+  @Get("metadata")
+  async getTableMetadata(@Query("table_name") tableName: string) {
+    if (!tableName) {
+      throw new BadRequestException("Table name is required.");
+    }
+
+    const query = `
+    SELECT *
+    FROM tables
+    WHERE table_name = '${tableName}';
+  `;
+    return await this.athenaService.executeQuery(query);
   }
 
   @Get("catalogs")
