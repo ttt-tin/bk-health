@@ -6,7 +6,6 @@ import {
   HttpStatus,
   Body,
   Post,
-  Put,
   BadRequestException,
 } from "@nestjs/common";
 import { AthenaService } from "./athena.service";

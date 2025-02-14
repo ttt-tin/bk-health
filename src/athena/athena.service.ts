@@ -211,17 +211,17 @@ export class AthenaService {
     }
 
     // Giả sử hàng đầu tiên là header
-    var headerRow = rawResults[0].Data;
-    var headers = headerRow.map(function (item: any) {
+    const headerRow = rawResults[0].Data;
+    const headers = headerRow.map(function (item: any) {
       return item.VarCharValue;
     });
 
     // Xử lý các hàng còn lại
-    var rows = [];
-    for (var i = 1; i < rawResults.length; i++) {
-      var rowData = rawResults[i].Data;
-      var rowObj: any = {};
-      for (var j = 0; j < headers.length; j++) {
+    const rows = [];
+    for (let i = 1; i < rawResults.length; i++) {
+      const rowData = rawResults[i].Data;
+      const rowObj: any = {};
+      for (let j = 0; j < headers.length; j++) {
         // Nếu không có dữ liệu cho cột nào đó, gán null
         rowObj[headers[j]] =
           rowData[j] && rowData[j].VarCharValue !== undefined
