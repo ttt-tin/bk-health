@@ -73,8 +73,7 @@ export class UploadController {
         throw new Error("Volume is required to determine the upload folder.");
 
       const bucketName = process.env.AWS_S3_BUCKET_NAME;
-      const folderPath = `unstructure/${requestData.volume}`; // Use volume as folder
-
+      const folderPath = `unstructure/${requestData.volume.replace(/_volume_table$/, "")}`;
       const fileExt = file.originalname.split(".").pop();
       const newFileName = `${Date.now()}-${uuidv4()}.${fileExt}`;
 
@@ -99,14 +98,10 @@ export class UploadController {
           throw new Error("No valid attributes found to determine patient_id.");
         }
 
-        // Construct WHERE condition to find patient_id
         const whereCondition = possibleKeys
           .map((key) => `${key} = '${requestData[key]}'`)
           .join(" OR ");
-
-        const findPatientQuery = `
-        SELECT id FROM patient_repaired WHERE ${whereCondition} LIMIT 1;
-      `;
+        const findPatientQuery = `SELECT id FROM patient_repaired WHERE ${whereCondition} LIMIT 1;`;
 
         const result = await this.athenaService.executeQuery(findPatientQuery);
         if (result.length === 0) {
@@ -118,18 +113,21 @@ export class UploadController {
         patientId = result[0].id;
       }
 
-      // Insert into user_files
+      const tableName = requestData.volume;
+
+      // Insert into the dynamically named table
       const insertQuery = `
-      INSERT INTO user_files (patient_id, file_path, create_date)
-      VALUES ('${patientId}', '${filePath}', '${createDate}');
+      INSERT INTO ${tableName} (patient_id, file_name, file_path, bucket_name, file_size, upload_timestamp)
+      VALUES ('${patientId}', '${newFileName}', ${filePath}, '${bucketName}', ${file.size}, current_timestamp);
     `;
 
-      await this.athenaService.executeQuery(insertQuery);
+      await this.athenaService.executeQuery(insertQuery, "metadata-db");
 
       return {
         message: "File uploaded and information saved successfully",
         filePath,
         patientId,
+        table: tableName,
       };
     } catch (error) {
       return { message: error.message };

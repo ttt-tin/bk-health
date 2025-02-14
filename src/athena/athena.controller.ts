@@ -35,7 +35,8 @@ export class AthenaController {
     FROM tables
     WHERE table_name = '${tableName}';
   `;
-    return await this.athenaService.executeQuery(query);
+    const result = await this.athenaService.executeQuery(query);
+    return result[0];
   }
 
   @Get("catalogs")

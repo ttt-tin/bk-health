@@ -89,11 +89,13 @@ export class AthenaService {
     }
   }
 
-  async executeQuery(query: string): Promise<any[]> {
+  async executeQuery(query: string, database?: string): Promise<any[]> {
     try {
       const command = new StartQueryExecutionCommand({
         QueryString: query,
-        QueryExecutionContext: { Database: "hospital_data" },
+        QueryExecutionContext: {
+          Database: database ? database : "hospital_data",
+        },
         ResultConfiguration: {
           OutputLocation: `s3://${process.env.AWS_ATHENA_OUTPUT_BUCKET}/athena-results/`,
         },
