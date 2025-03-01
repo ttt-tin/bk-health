@@ -10,6 +10,7 @@ import { MappingModule } from "./mapping/mapping.module";
 import * as dotenv from "dotenv";
 import { AthenaModule } from "./athena/athena..module";
 import { HistoryModule } from "./history/history.module";
+import { RelationshipModule } from "./relation/relation.module";
 dotenv.config();
 
 @Module({
@@ -32,8 +33,9 @@ dotenv.config();
     MappingModule,
     AthenaModule,
     HistoryModule,
+    RelationshipModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
