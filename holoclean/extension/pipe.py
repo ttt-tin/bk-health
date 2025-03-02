@@ -25,10 +25,10 @@ HOLOCLEAN_SCRIPT = "holoclean/run/script1.sh"
 
 # PostgreSQL Configuration
 DB_CONFIG = {
-    'dbname': os.getenv('DB_NAME'),
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD'),
-    'host': os.getenv('DB_HOST'),
+    'dbname': os.getenv('HOLO_DB_NAME'),
+    'user': os.getenv('HOLO_DB_USER'),
+    'password': os.getenv('HOLO_DB_PASSWORD'),
+    'host': os.getenv('HOLO_DB_HOST'),
     'port': 5432
 }
 
@@ -167,17 +167,17 @@ def pipeline():
             time.sleep(POLLING_INTERVAL)
             return
         
-        # Process files in batches
-        batch = unprocessed_files[:BATCH_SIZE]
-        print(f"Processing batch: {batch}")
-        local_files = download_batch(batch)
+        # # Process files in batches
+        # batch = unprocessed_files[:BATCH_SIZE]
+        # print(f"Processing batch: {batch}")
+        # local_files = download_batch(batch)
 
-        # Mark files as processed (before running extract to avoid duplication)
-        for file_key in batch:
-            mark_file_as_processed(file_key)
+        # # Mark files as processed (before running extract to avoid duplication)
+        # for file_key in batch:
+        #     mark_file_as_processed(file_key)
 
-        # Run extract.py
-        run_extraction()
+        # # Run extract.py
+        # run_extraction()
 
         # Run Holoclean
         run_holoclean()

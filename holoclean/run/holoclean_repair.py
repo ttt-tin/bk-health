@@ -19,7 +19,7 @@ s3_output_database = os.getenv('S3_DATABASE')
 
 # 1. Setup a HoloClean session
 hc = holoclean.HoloClean(
-    db_name='web_service_db_2',
+    db_name='holo',
     domain_thresh_1=0,
     domain_thresh_2=0,
     weak_label_thresh=0.99,
@@ -77,11 +77,11 @@ def get_table_structure_and_data(table_name):
     connection = None
     try:
         # Kết nối với cơ sở dữ liệu
-        pwd = os.getenv('DB_PASSWORD')
-        host = os.getenv('DB_HOST')
-        user = os.getenv('DB_USER')
-        port = os.getenv('DB_PORT')
-        database = os.getenv('DB_NAME')
+        pwd = os.getenv('HOLO_DB_PASSWORD')
+        host = os.getenv('HOLO_DB_HOST')
+        user = os.getenv('HOLO_DB_USER')
+        port = os.getenv('HOLO_DB_PORT')
+        database = os.getenv('HOLO_DB_NAME')
 
         if not all([pwd, host, user, port, database]):
             raise ValueError("Thiếu thông tin kết nối cơ sở dữ liệu trong biến môi trường.")
