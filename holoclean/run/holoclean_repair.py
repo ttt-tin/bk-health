@@ -152,73 +152,134 @@ def generate_create_table_query_from_db(prefix, table_name, table_structure):
         print(f"Lỗi khi tạo câu lệnh CREATE TABLE: {e}")
         return None
 
-def generate_insert_query_from_db(prefix, table_name, table_structure):
+# def generate_insert_query_from_db(prefix, table_name, table_structure):
+#     """
+#     Tạo câu lệnh INSERT INTO từ dữ liệu bảng.
+#     """
+#     try:
+#         rows = table_structure['data']
+#         column_names = table_structure['column_names']
+
+#         # Chuẩn bị câu lệnh INSERT
+#         query = f"INSERT INTO \"{prefix}\".\"{table_name}\" ({', '.join(column_names)}) VALUES\n"
+#         values_list = []
+
+#         # Duyệt qua các hàng dữ liệu
+#         for row in rows:
+#             values = []
+#             for value in row:
+#                 if value is None:  # Xử lý NULL
+#                     values.append("NULL")
+#                 elif isinstance(value, str):  # Xử lý chuỗi
+#                     # Sử dụng cách thay thế dấu nháy đơn mà không sử dụng f-string
+#                     values.append("'" + value.replace("'", "''") + "'")
+#                 else:  # Xử lý số, boolean
+#                     values.append(str(value))
+
+
+#             values_list.append(f"({', '.join(values)})")
+
+#         query += ",\n".join(values_list) + ";"
+#         return query
+#     except Exception as e:
+#         print(f"Lỗi khi tạo câu lệnh INSERT INTO: {e}")
+#         return None
+
+def generate_insert_query_from_db(database, table_name, table_structure, row_data):
     """
-    Tạo câu lệnh INSERT INTO từ dữ liệu bảng.
+    Generate a single INSERT INTO query for one row of data.
+    
+    Args:
+        database (str): The database name.
+        table_name (str): The target table name.
+        table_structure (dict): Dict with column names as keys and data types as values.
+        row_data (tuple/list): A single row of data matching the table structure.
+    
+    Returns:
+        str: A single INSERT INTO query.
     """
-    try:
-        rows = table_structure['data']
-        column_names = table_structure['column_names']
-
-        # Chuẩn bị câu lệnh INSERT
-        query = f"INSERT INTO \"{prefix}\".\"{table_name}\" ({', '.join(column_names)}) VALUES\n"
-        values_list = []
-
-        # Duyệt qua các hàng dữ liệu
-        for row in rows:
-            values = []
-            for value in row:
-                if value is None:  # Xử lý NULL
-                    values.append("NULL")
-                elif isinstance(value, str):  # Xử lý chuỗi
-                    # Sử dụng cách thay thế dấu nháy đơn mà không sử dụng f-string
-                    values.append("'" + value.replace("'", "''") + "'")
-                else:  # Xử lý số, boolean
-                    values.append(str(value))
-
-
-            values_list.append(f"({', '.join(values)})")
-
-        query += ",\n".join(values_list) + ";"
-        return query
-    except Exception as e:
-        print(f"Lỗi khi tạo câu lệnh INSERT INTO: {e}")
-        return None
-
-# Ví dụ sử dụng
+    columns = ", ".join(table_structure.keys())
+    # Format values based on their data types
+    formatted_values = []
+    for col, value in zip(table_structure.keys(), row_data):
+        dtype = table_structure[col]
+        if value is None:
+            formatted_values.append("NULL")
+        elif "string" in dtype.lower() or "varchar" in dtype.lower():
+            formatted_values.append(f"'{value}'")  # String values need quotes
+        else:
+            formatted_values.append(str(value))    # Numeric values, no quotes
+    
+    values = ", ".join(formatted_values)
+    query = f"""
+    INSERT INTO {database}.{table_name} ({columns})
+    VALUES ({values})
+    """
+    return query
 
 def execute_athena_query(database, output_bucket, table_name, region):
-    # Lấy cấu trúc và dữ liệu của bảng
     table_structure = get_table_structure_and_data(table_name)
 
     if table_structure:
-        # Tạo câu lệnh CREATE TABLE
-        create_table_query = generate_create_table_query_from_db(s3_output_database, table_name, table_structure)
-        # Tạo câu lệnh INSERT INTO
-        insert_query = generate_insert_query_from_db(s3_output_database, table_name, table_structure)
-
-        # Kết nối với Athena
-        conn = connect(
-            aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
-            s3_staging_dir=output_bucket,
-            region_name=region,
-            schema_name=database
-        )
-
-        # Thực thi CREATE TABLE và kiểm tra kết quả
-        cursor = conn.cursor()
+        # Connect to Athena
         try:
+            conn = connect(
+                aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+                aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+                s3_staging_dir=output_bucket,  # e.g., 's3://my-bucket/athena-output/'
+                region_name=region,            # e.g., 'us-east-1'
+                schema_name=database           # e.g., 'my_database'
+            )
+
+            # Execute CREATE TABLE and check result
+            create_table_query = generate_create_table_query_from_db(database, table_name, table_structure)
+            cursor = conn.cursor()
             cursor.execute(create_table_query)
             print("Table created successfully.")
+
             
-            # Sau khi CREATE TABLE thành công, thực thi INSERT INTO
+            select_query = f"""
+                SELECT 
+                    id,
+                    table_reference AS tableReference,
+                    table_was_reference AS tableWasReference,
+                    pri_key AS priKey,
+                    fo_key AS foKey
+                FROM {database}.relationships
+                WHERE table_reference = {table_name}
+            """
+
+            cursor.execute(select_query)
+            rows = cursor.fetchall()
+            records = table_structure['data']
+            column_names = table_structure['column_names']
+            for row in rows:
+                for record in records:
+                    #####################################
+                    # Implement logic update related id #
+                    #####################################
+
+
+                    print(f"ID: {row[0]}, TableReference: {row[1]}, TableWasReference: {row[2]}, PriKey: {row[3]}, FoKey: {row[4]}")
+        
+            
+            # After CREATE TABLE succeeds, execute INSERT INTO
+            insert_query = generate_insert_query_from_db(database, table_name, table_structure)
             cursor.execute(insert_query)
             print("Data inserted successfully.")
+        
         except Exception as e:
             print(f"Error occurred: {e}")
+        
+        finally:
+            # Clean up connection
+            if 'cursor' in locals():
+                cursor.close()
+            if 'conn' in locals():
+                conn.close()
 
-def setup_mapping_table():
+
+def setup_mapping_table(table_name):
     """Create mapping table if not exists"""
     connection = None
     try:
@@ -226,7 +287,7 @@ def setup_mapping_table():
         cursor = connection.cursor()
         
         create_table_query = """
-        CREATE TABLE IF NOT EXISTS id_mapping (
+        CREATE TABLE IF NOT EXISTS {table_name}_id_mapping (
             id SERIAL PRIMARY KEY,
             database_name VARCHAR(255),
             old_id VARCHAR(255),
@@ -254,7 +315,7 @@ def save_error_data(df, database_name, table_name, error_message):
     logging.error(f"Data saved to {error_file}: {error_message}")
     return error_file
 
-def update_relation_ids(df, table_name):
+def get_relation_id(df, table_name, database_name, old_id):
     """Update relation IDs based on mapping table"""
     connection = None
     try:
@@ -266,19 +327,16 @@ def update_relation_ids(df, table_name):
             SELECT old_id, new_id 
             FROM id_mapping 
             WHERE table_name = %s
-        """, (table_name,))
+            AND database_name = %s
+            AND old_id = %s
+        """, (table_name, database_name, old_id))
         
         mapping = {row[0]: row[1] for row in cursor.fetchall()}
         
-        # Update relation columns if they exist
-        for col in ['pri_key', 'fo_key']:
-            if col in df.columns:
-                df[col] = df[col].map(lambda x: mapping.get(x, x))
-                
-        return df
+        return mapping[1]
     except Exception as e:
         logging.error(f"Error updating relation IDs: {e}")
-        return df
+        return False
     finally:
         if connection:
             connection.close()
@@ -350,12 +408,30 @@ def process_and_insert_data(merged_df, base_name, output_bucket, database, regio
         
         cursor = conn.cursor()
         table_name = f'{base_name}_repaired'
+
+        create_query = generate_create_table_query_from_db(database, table_name, repaired_df)
+        cursor.execute(create_query)
+
+        select_query = f"""
+            SELECT 
+                id,
+                table_reference AS tableReference,
+                table_was_reference AS tableWasReference,
+                pri_key AS priKey,
+                fo_key AS foKey
+            FROM {database}.relationships
+            WHERE table_reference = {base_name}
+            LIMIT 5
+        """
+
+        cursor.execute(select_query)
+        rows = cursor.fetchall()
+        for row in rows:
+            print(f"ID: {row[0]}, TableReference: {row[1]}, TableWasReference: {row[2]}, PriKey: {row[3]}, FoKey: {row[4]}")
         
         # Create table and insert data
-        create_query = generate_create_table_query_from_db(database, table_name, repaired_df)
         insert_query = generate_insert_query_from_db(database, table_name, repaired_df)
         
-        cursor.execute(create_query)
         cursor.execute(insert_query)
         
         connection.commit()
@@ -393,9 +469,7 @@ def cron_job_reprocess_errors():
                     logging.info(f"Successfully reprocessed and removed {file_path}")
                 except Exception as e:
                     logging.error(f"Failed to reprocess {file_path}: {e}")
-
 # Main execution
-# setup_mapping_table()
 
 # Lặp qua các thư mục trong folder 'standard' (chẳng hạn 'patient', 'condition')
 for subfolder in os.listdir(data_folder):
@@ -457,6 +531,9 @@ for subfolder in os.listdir(data_folder):
         #             tid_col='tid',
         #             attr_col='attribute',
         #             val_col='correct_val')
+
+        setup_mapping_table(base_name)
+
 
         output_bucket = os.getenv('S3_OUTPUT_BUCKET')
         database = os.getenv('S3_DATABASE')
