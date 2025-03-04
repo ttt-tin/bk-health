@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import sys
@@ -217,7 +218,7 @@ def generate_insert_query_from_db(database, table_name, table_structure, row_dat
     """
     return query
 
-def execute_athena_query(database, output_bucket, table_name, region):
+def execute_athena_query(database, output_bucket, table_name, region, database_name):
     table_structure = get_table_structure_and_data(table_name)
 
     if table_structure:
@@ -250,22 +251,38 @@ def execute_athena_query(database, output_bucket, table_name, region):
             """
 
             cursor.execute(select_query)
-            rows = cursor.fetchall()
+            relations = cursor.fetchall()
             records = table_structure['data']
-            column_names = table_structure['column_names']
-            for row in rows:
-                for record in records:
+            missing_ref_data = []
+            for record in records:
+                for relation in relations:
                     #####################################
                     # Implement logic update related id #
                     #####################################
 
+                    mapping_data_query = f"""
+                        SELECT *
+                        FROM {database}.{relation['tableWasReference']}_id_mapping
+                        WHERE old_id = {record[relation['foKey']]}
+                        AND database_name = {database_name}
+                        AND table_name = {table_name}
+                    """
 
-                    print(f"ID: {row[0]}, TableReference: {row[1]}, TableWasReference: {row[2]}, PriKey: {row[3]}, FoKey: {row[4]}")
-        
-            
-            # After CREATE TABLE succeeds, execute INSERT INTO
-            insert_query = generate_insert_query_from_db(database, table_name, table_structure)
-            cursor.execute(insert_query)
+                    cursor.execute(mapping_data_query)
+                    mapping_result = cursor.fetchone()
+
+                    if mapping_result:
+                        print(f"Found mapping for record: {record}")
+                        record[relation['foKey']] = mapping_result['new_id']
+                    else:
+                        # If no mapping data found, add the current record to error_records
+                        missing_ref_data.append(record)
+
+                
+                # After CREATE TABLE succeeds, execute INSERT INTO
+                insert_query = generate_insert_query_from_db(database, table_name, table_structure, record)
+                cursor.execute(insert_query)
+
             print("Data inserted successfully.")
         
         except Exception as e:
@@ -279,7 +296,7 @@ def execute_athena_query(database, output_bucket, table_name, region):
                 conn.close()
 
 
-def setup_mapping_table(table_name):
+def setup_mapping_table(database_name, table_name):
     """Create mapping table if not exists"""
     connection = None
     try:
@@ -471,76 +488,93 @@ def cron_job_reprocess_errors():
                     logging.error(f"Failed to reprocess {file_path}: {e}")
 # Main execution
 
-# Lặp qua các thư mục trong folder 'standard' (chẳng hạn 'patient', 'condition')
-for subfolder in os.listdir(data_folder):
-    subfolder_path = os.path.join(data_folder, subfolder)
-
-    # print('')
+def merge_csv_files_in_folder(folder_path):
+    """
+    Merge tất cả các file CSV trong thư mục con.
+    """
+    csv_files = [f for f in os.listdir(folder_path) if f.endswith('.csv')]
     
-    # Kiểm tra xem đó có phải là thư mục không
-    if not os.path.isdir(subfolder_path):
+    if not csv_files:
+        print(f"Không có file CSV nào trong thư mục: {folder_path}.")
+        return None
+        [pd.read_csv(os.path.join(folder_path, f)) for f in csv_files],
+    
+    merged_df = pd.concat(
+        ignore_index=True
+    )
+    print(f"Đã merge {len(csv_files)} file trong thư mục: {folder_path}")
+    return merged_df
+
+
+for database_name in os.listdir(data_folder):
+    database_path = os.path.join(data_folder, database_name)
+    
+    if not os.path.isdir(database_path):
         continue
-
-    print(f"Processing folder: {subfolder}")
-
-    # Merge tất cả các file CSV trong thư mục con
-    merged_df = merge_csv_files_in_folder(subfolder_path)
-
-    if merged_df is not None:
-        # Lưu dữ liệu đã merge vào một file CSV mới (tuỳ chọn)
-        merged_file_path = os.path.join(subfolder_path, f'{subfolder}_merged.csv')
-        merged_df.to_csv(merged_file_path, index=False)
-        print(f"Đã lưu file đã merge tại: {merged_file_path}")
-
-        # Lấy tên base (patient chẳng hạn)
-        base_name = subfolder  # Thường thì tên thư mục là base name, có thể thay đổi theo yêu cầu
-
-        # Lấy file constraint
-        constraint_file = os.path.join(constraint_folder, f'{base_name}_constraints.txt')
-
-        # Kiểm tra file constraints tồn tại
-        if not os.path.exists(constraint_file):
-            print(f"Warning: Constraint file for '{base_name}' not found. Skipping.")
+    
+    print(f"Processing database: {database_name}")
+    
+    for subfolder in os.listdir(database_path):
+        subfolder_path = os.path.join(database_path, subfolder)
+        
+        if not os.path.isdir(subfolder_path):
             continue
+        
+        print(f"Processing table: {subfolder} in database {database_name}")
+        merged_df = merge_csv_files_in_folder(subfolder_path)
+        
+        if merged_df is not None:
 
-        print(f"Processing dataset: {base_name}")
+            merged_file_path = os.path.join(subfolder_path, f'{subfolder}_merged.csv')
+            merged_df.to_csv(merged_file_path, index=False)
+            print(f"Đã lưu file đã merge tại: {merged_file_path}")
 
-        # 2. Load training data và denial constraints
-        print(base_name, merged_file_path)
-        hc.load_data(base_name, merged_file_path)
+            base_name = subfolder
 
-        hc.load_dcs(constraint_file)
-        hc.ds.set_constraints(hc.get_dcs())
+            constraint_file = os.path.join(constraint_folder, f'{base_name}_constraints.txt')
 
-        # 3. Detect erroneous cells using these two detectors
-        detectors = [NullDetector(), ViolationDetector()]
-        hc.detect_errors(detectors)
+            if not os.path.exists(constraint_file):
+                print(f"Warning: Constraint file for '{base_name}' not found. Skipping.")
+                continue
 
-        # 4. Repair errors utilizing the defined features
-        hc.setup_domain()
-        featurizers = [
-            InitAttrFeaturizer(),
-            OccurAttrFeaturizer(),
-            FreqFeaturizer(),
-            ConstraintFeaturizer(),
-        ]
-        hc.repair_errors(featurizers)
+            print(f"Processing dataset: {base_name}")
 
-        # 5. Evaluate the correctness of the results (optional)
-        # hc.evaluate(fpath='../testdata/inf_values_dom.csv',
-        #             tid_col='tid',
-        #             attr_col='attribute',
-        #             val_col='correct_val')
+            # 2. Load training data và denial constraints
+            print(base_name, merged_file_path)
+            hc.load_data(base_name, merged_file_path)
 
-        setup_mapping_table(base_name)
+            hc.load_dcs(constraint_file)
+            hc.ds.set_constraints(hc.get_dcs())
+
+            # 3. Detect erroneous cells using these two detectors
+            detectors = [NullDetector(), ViolationDetector()]
+            hc.detect_errors(detectors)
+
+            # 4. Repair errors utilizing the defined features
+            hc.setup_domain()
+            featurizers = [
+                InitAttrFeaturizer(),
+                OccurAttrFeaturizer(),
+                FreqFeaturizer(),
+                ConstraintFeaturizer(),
+            ]
+            hc.repair_errors(featurizers)
+
+            # 5. Evaluate the correctness of the results (optional)
+            # hc.evaluate(fpath='../testdata/inf_values_dom.csv',
+            #             tid_col='tid',
+            #             attr_col='attribute',
+            #             val_col='correct_val')
+
+            setup_mapping_table(database_name, base_name)
 
 
-        output_bucket = os.getenv('S3_OUTPUT_BUCKET')
-        database = os.getenv('S3_DATABASE')
-        region = os.getenv('AWS_REGION')
+            output_bucket = os.getenv('S3_OUTPUT_BUCKET')
+            database = os.getenv('S3_DATABASE')
+            region = os.getenv('AWS_REGION')
 
-        execute_athena_query(database, output_bucket, f'{base_name}_repaired', region)
+            execute_athena_query(database, output_bucket, f'{base_name}_repaired', region, database_name)
 
-        print(f"Finished processing dataset: {base_name}")
+            print(f"Finished processing dataset: {base_name}")
 
 print("All datasets processed.")
