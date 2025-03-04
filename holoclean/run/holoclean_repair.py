@@ -278,10 +278,46 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                         # If no mapping data found, add the current record to error_records
                         missing_ref_data.append(record)
 
+                #########################################
+                # Implement logic to check exist record #
+                #########################################
+
                 
-                # After CREATE TABLE succeeds, execute INSERT INTO
-                insert_query = generate_insert_query_from_db(database, table_name, table_structure, record)
-                cursor.execute(insert_query)
+                get_key_query = f"""
+                SELECT 
+                    *
+                FROM {database}.tables
+                WHERE table_name = {table_name}
+                """
+
+                cursor.execute(get_key_query)
+                keys_unique = cursor.fetchall()
+
+                IS_EXIST_RECORD = False
+
+                for key_unique in keys_unique:
+                    parts = [p.strip() for p in key_unique.split(",")]
+                    where = ''
+                    for part in parts:
+                        if len(where) == 0:
+                            where = f"{part} = {record[part]}"
+                        else:
+                            where = where + f"AND {part} = {record[part]}"
+                    exist_record_query = f"""
+                    SELECT 
+                        *
+                    FROM {database}.{table_name}_repaired
+                    WHERE {where_conditions}
+                    """
+
+                    cursor.execute(exist_record_query)
+                    exists_record = cursor.fetchall()
+                    if (exists_record):
+                        IS_EXIST_RECORD = True
+                if not IS_EXIST_RECORD:
+                    # After CREATE TABLE succeeds, execute INSERT INTO
+                    insert_query = generate_insert_query_from_db(database, table_name, table_structure, record)
+                    cursor.execute(insert_query)
 
             print("Data inserted successfully.")
         
