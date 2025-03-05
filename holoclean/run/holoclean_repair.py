@@ -199,24 +199,30 @@ def generate_insert_query_from_db(database, table_name, table_structure, row_dat
     Returns:
         str: A single INSERT INTO query.
     """
-    columns = ", ".join(table_structure.keys())
-    # Format values based on their data types
-    formatted_values = []
-    for col, value in zip(table_structure.keys(), row_data):
-        dtype = table_structure[col]
-        if value is None:
-            formatted_values.append("NULL")
-        elif "string" in dtype.lower() or "varchar" in dtype.lower():
-            formatted_values.append(f"'{value}'")  # String values need quotes
-        else:
-            formatted_values.append(str(value))    # Numeric values, no quotes
+    try:
+        columns = ", ".join(row_data.keys())  # Lấy danh sách cột từ key của dictionary
+        
+        formatted_values = []
+        for value in row_data.values():
+            if value is None:
+                formatted_values.append("NULL")  # Giá trị NULL
+            elif isinstance(value, str):
+                formatted_values.append("'" + value.replace("'", "''") + "'")
+
+            else:
+                formatted_values.append(str(value))  # Giá trị số giữ nguyên
+
+        values = ", ".join(formatted_values)
+
+        query = f"""
+        INSERT INTO {database}.{table_name} ({columns})
+        VALUES ({values});
+        """
+        return query.strip()
     
-    values = ", ".join(formatted_values)
-    query = f"""
-    INSERT INTO {database}.{table_name} ({columns})
-    VALUES ({values})
-    """
-    return query
+    except Exception as e:
+        print(f"Lỗi khi tạo câu lệnh INSERT INTO: {e}")
+        return None
 
 def execute_athena_query(database, output_bucket, table_name, region, database_name):
     table_structure = get_table_structure_and_data(table_name)
@@ -247,14 +253,19 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     pri_key AS priKey,
                     fo_key AS foKey
                 FROM {database}.relationships
-                WHERE table_reference = {table_name}
+                WHERE table_reference = '{table_name}'
             """
 
             cursor.execute(select_query)
             relations = cursor.fetchall()
-            records = table_structure['data']
+            columns = table_structure["columns"]
+            records = [dict(zip(columns, record)) for record in table_structure["data"]]
+            records_dict = [{key[0]: value for key, value in record.items()} for record in records]
+
+            # records = table_structure['data']
             missing_ref_data = []
-            for record in records:
+            for record in records_dict:
+                print('record', record)
                 for relation in relations:
                     #####################################
                     # Implement logic update related id #
@@ -263,9 +274,9 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     mapping_data_query = f"""
                         SELECT *
                         FROM {database}.{relation['tableWasReference']}_id_mapping
-                        WHERE old_id = {record[relation['foKey']]}
-                        AND database_name = {database_name}
-                        AND table_name = {table_name}
+                        WHERE old_id = '{record[relation['foKey']]}'
+                        AND database_name = '{database_name}'
+                        AND table_name = '{table_name}'
                     """
 
                     cursor.execute(mapping_data_query)
@@ -287,7 +298,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                 SELECT 
                     *
                 FROM {database}.tables
-                WHERE table_name = {table_name}
+                WHERE table_name = '{table_name}'
                 """
 
                 cursor.execute(get_key_query)
@@ -295,28 +306,40 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
 
                 IS_EXIST_RECORD = False
 
+                print('keys_unique', keys_unique[0][2])
+
                 for key_unique in keys_unique:
-                    parts = [p.strip() for p in key_unique.split(",")]
+                    parts = [p.strip() for p in key_unique[2].split(",")]
                     where = ''
                     for part in parts:
-                        if len(where) == 0:
-                            where = f"{part} = {record[part]}"
-                        else:
-                            where = where + f"AND {part} = {record[part]}"
+                        try:
+                            if (record[part]):
+                                print('record', record)
+                                if len(where) == 0:
+                                    where = f"{part} = '{record[part]}'"
+                                else:
+                                    where = where + f"AND {part} = '{record[part]}'"
+                        except KeyError:
+                            print(f"⚠️ Key '{part}' không tồn tại trong record: {record}")
+                        except Exception as e:
+                            print(f"⚠️ Lỗi khác xảy ra: {e}")
                     exist_record_query = f"""
                     SELECT 
                         *
-                    FROM {database}.{table_name}_repaired
-                    WHERE {where_conditions}
+                    FROM {database}.{table_name}
+                    WHERE {where}
                     """
 
-                    cursor.execute(exist_record_query)
-                    exists_record = cursor.fetchall()
-                    if (exists_record):
-                        IS_EXIST_RECORD = True
+                    if (len(where)):
+                        print('exist_record_query', exist_record_query)
+                        cursor.execute(exist_record_query)
+                        exists_record = cursor.fetchall()
+                        if (exists_record):
+                            IS_EXIST_RECORD = True
                 if not IS_EXIST_RECORD:
                     # After CREATE TABLE succeeds, execute INSERT INTO
                     insert_query = generate_insert_query_from_db(database, table_name, table_structure, record)
+                    print('insert_query', insert_query)
                     cursor.execute(insert_query)
 
             print("Data inserted successfully.")
@@ -339,16 +362,18 @@ def setup_mapping_table(database_name, table_name):
         connection = get_db_connection()
         cursor = connection.cursor()
         
-        create_table_query = """
-        CREATE TABLE IF NOT EXISTS {table_name}_id_mapping (
-            id SERIAL PRIMARY KEY,
-            database_name VARCHAR(255),
-            old_id VARCHAR(255),
-            new_id VARCHAR(255),
-            table_name VARCHAR(255),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        create_table_query = f"""
+            CREATE TABLE IF NOT EXISTS hospital_data.{table_name}_id_mapping (
+                id INT,
+                database_name STRING,
+                old_id STRING,
+                new_id STRING,
+                table_name STRING,
+                created_at TIMESTAMP
+            ) LOCATION 's3://bk-health-bucket-trusted/' TBLPROPERTIES ('table_type' = 'ICEBERG', 'format' = 'parquet');
         """
+
+        print('create_table_query',create_table_query )
         cursor.execute(create_table_query)
         connection.commit()
     except Exception as e:
@@ -473,8 +498,7 @@ def process_and_insert_data(merged_df, base_name, output_bucket, database, regio
                 pri_key AS priKey,
                 fo_key AS foKey
             FROM {database}.relationships
-            WHERE table_reference = {base_name}
-            LIMIT 5
+            WHERE table_reference = '{base_name}'
         """
 
         cursor.execute(select_query)
@@ -533,11 +557,13 @@ def merge_csv_files_in_folder(folder_path):
     if not csv_files:
         print(f"Không có file CSV nào trong thư mục: {folder_path}.")
         return None
-        [pd.read_csv(os.path.join(folder_path, f)) for f in csv_files],
+
+    # Đọc từng file CSV vào danh sách các DataFrame
+    dfs = [pd.read_csv(os.path.join(folder_path, f)) for f in csv_files]
+
+    # Merge tất cả các DataFrame
+    merged_df = pd.concat(dfs, ignore_index=True)
     
-    merged_df = pd.concat(
-        ignore_index=True
-    )
     print(f"Đã merge {len(csv_files)} file trong thư mục: {folder_path}")
     return merged_df
 
@@ -575,7 +601,7 @@ for database_name in os.listdir(data_folder):
 
             print(f"Processing dataset: {base_name}")
 
-            # 2. Load training data và denial constraints
+            2. Load training data và denial constraints
             print(base_name, merged_file_path)
             hc.load_data(base_name, merged_file_path)
 

@@ -96,5 +96,5 @@ def map_csv_to_table(input_folder, mapping_json, database_name):
 if __name__ == "__main__":
     input_folder_path = "./output"
     mapping_json_path = "mapping.json"
-    database_name = "bk_health_lakehouse_db"
+    database_name = "hospital_data"
     map_csv_to_table(input_folder_path, mapping_json_path, database_name)
