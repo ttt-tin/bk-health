@@ -37,6 +37,23 @@ export class UploadController {
     }
   }
 
+  @Get("file")
+  async runUploadFile(
+    @Query("folderPath") folderPath: string,
+    @Query("databaseName") databaseName: string,
+  ): Promise<any> {
+    try {
+      await this.uploadService.uploadAllFilesInFolder(
+        folderPath,
+        process.env.DEST_FOLDER,
+        databaseName,
+      );
+      return true;
+    } catch (error) {
+      return error.message;
+    }
+  }
+
   @Post("file")
   @UseInterceptors(FileInterceptor("file"))
   async uploadFileForTextract(

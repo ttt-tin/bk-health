@@ -1,10 +1,13 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
-import { UploadS3Service } from './upload/upload-s3.service';
+import { Controller, Get } from "@nestjs/common";
+import { AppService } from "./app.service";
+import { UploadS3Service } from "./upload/upload-s3.service";
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService, private readonly uploadS3Service: UploadS3Service) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly uploadS3Service: UploadS3Service,
+  ) {}
 
   @Get()
   async getHello(): Promise<any> {
@@ -13,8 +16,12 @@ export class AppController {
     const sourceFolder = process.env.SOURCE_FOLDER;
     const destFolder = process.env.DEST_FOLDER;
 
-    console.log('Starting file upload to S3...');
-    await this.uploadS3Service.uploadAllFilesInFolder(sourceFolder, destFolder);
-    console.log('File upload completed.');
+    console.log("Starting file upload to S3...");
+    await this.uploadS3Service.uploadAllFilesInFolder(
+      sourceFolder,
+      destFolder,
+      "hospital1",
+    );
+    console.log("File upload completed.");
   }
 }

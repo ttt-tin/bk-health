@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Delete, Param, Body } from "@nestjs/common";
-import { RelationshipService } from "./relationship.service";
-import { CreateRelationshipDto } from "./relationship.dto";
+import { RelationshipService } from "./relation.service";
+import { CreateRelationshipDto } from "./dto/relationship.dto";
 
 @Controller("relationships")
 export class RelationshipController {
