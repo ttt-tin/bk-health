@@ -10,6 +10,8 @@ import { MappingModule } from "./mapping/mapping.module";
 import * as dotenv from "dotenv";
 import { AthenaModule } from "./athena/athena..module";
 import { HistoryModule } from "./history/history.module";
+import { ExternalVolumeModule } from "./external-volume/external-volume.module";
+import { S3Module } from "./s3/s3.module";
 dotenv.config();
 
 @Module({
@@ -32,6 +34,8 @@ dotenv.config();
     MappingModule,
     AthenaModule,
     HistoryModule,
+    ExternalVolumeModule,
+    S3Module,
   ],
   controllers: [AppController],
   providers: [AppService],

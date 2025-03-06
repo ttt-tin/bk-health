@@ -118,7 +118,7 @@ export class UploadController {
       // Insert into the dynamically named table
       const insertQuery = `
       INSERT INTO ${tableName} (patient_id, file_name, file_path, bucket_name, file_size, upload_timestamp)
-      VALUES ('${patientId}', '${newFileName}', ${filePath}, '${bucketName}', ${file.size}, current_timestamp);
+      VALUES ('${patientId}', '${newFileName}', '${filePath}', '${bucketName}', ${file.size}, current_timestamp);
     `;
 
       await this.athenaService.executeQuery(insertQuery, "metadata-db");
