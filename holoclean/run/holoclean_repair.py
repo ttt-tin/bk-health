@@ -10,6 +10,7 @@ from datetime import datetime
 import psycopg2
 from dotenv import load_dotenv
 from pyathena import connect
+import uuid
 
 load_dotenv()
 
@@ -130,7 +131,7 @@ def generate_create_table_query_from_db(prefix, table_name, table_structure):
     Tạo câu lệnh CREATE TABLE từ cấu trúc bảng.
     """
     try:
-        columns_definitions = []
+        columns_definitions = ["key_id STRING"]
         for column_name, data_type in table_structure['columns']:
             if data_type in ["character varying", "text"]:
                 sql_type = "STRING"
@@ -200,7 +201,12 @@ def generate_insert_query_from_db(database, table_name, table_structure, row_dat
         str: A single INSERT INTO query.
     """
     try:
-        columns = ", ".join(row_data.keys())  # Lấy danh sách cột từ key của dictionary
+        KEY_ID = str(uuid.uuid4())
+        row_data = dict(row_data)
+        if "key_id" not in row_data:
+            row_data["key_id"] = KEY_ID
+        
+        columns = ", ".join(row_data.keys())
         
         formatted_values = []
         for value in row_data.values():
@@ -218,11 +224,11 @@ def generate_insert_query_from_db(database, table_name, table_structure, row_dat
         INSERT INTO {database}.{table_name} ({columns})
         VALUES ({values});
         """
-        return query.strip()
+        return query.strip(), KEY_ID
     
     except Exception as e:
         print(f"Lỗi khi tạo câu lệnh INSERT INTO: {e}")
-        return None
+        return None, None
 
 def execute_athena_query(database, output_bucket, table_name, region, database_name):
     table_structure = get_table_structure_and_data(table_name)
@@ -307,9 +313,12 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                 IS_EXIST_RECORD = False
 
                 print('keys_unique', keys_unique[0][2])
+                old_id = None
 
                 for key_unique in keys_unique:
                     parts = [p.strip() for p in key_unique[2].split(",")]
+                    if len(parts) == 1:
+                        old_id = record[parts[0]]
                     where = ''
                     for part in parts:
                         try:
@@ -333,13 +342,26 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     if (len(where)):
                         print('exist_record_query', exist_record_query)
                         cursor.execute(exist_record_query)
-                        exists_record = cursor.fetchall()
-                        if (exists_record):
-                            IS_EXIST_RECORD = True
+                        exists_record = cursor.fetchall()  # Chỉ gọi fetchall() 1 lần
+                        if exists_record:
+                            columns = [desc[0] for desc in cursor.description]
+                            exists_record = [dict(zip(columns, row)) for row in exists_record]  # Dùng dữ liệu đã lấy
+
+                            IS_EXIST_RECORD = len(exists_record) > 0
+                            print('test 2', table_name, str(uuid.uuid4()), database, old_id, exists_record[0])
+                            check_exist = check_exist_id_mapping(table_name, old_id, exists_record[0]['key_id'])
+                            if not check_exist:
+                                mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database, old_id, exists_record[0]['key_id'])
+                                print('mapping_id_query', mapping_id_query)
+                                cursor.execute(mapping_id_query)
                 if not IS_EXIST_RECORD:
                     # After CREATE TABLE succeeds, execute INSERT INTO
-                    insert_query = generate_insert_query_from_db(database, table_name, table_structure, record)
-                    print('insert_query', insert_query)
+                    print('test 1')
+                    insert_query, key_id = generate_insert_query_from_db(database, table_name, table_structure, record)
+                    check_exist = check_exist_id_mapping(table_name, old_id, key_id)
+                    if not check_exist:
+                        mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database, old_id, key_id)
+                        cursor.execute(mapping_id_query)
                     cursor.execute(insert_query)
 
             print("Data inserted successfully.")
@@ -359,28 +381,138 @@ def setup_mapping_table(database_name, table_name):
     """Create mapping table if not exists"""
     connection = None
     try:
-        connection = get_db_connection()
-        cursor = connection.cursor()
+        output_bucket = os.getenv('S3_OUTPUT_BUCKET')
+        database = os.getenv('S3_DATABASE')
+        region = os.getenv('AWS_REGION')
+            
+        conn = connect(
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+            s3_staging_dir=output_bucket,  # e.g., 's3://my-bucket/athena-output/'
+            region_name=region,            # e.g., 'us-east-1'
+            schema_name=database           # e.g., 'my_database'
+        )
+
+        cursor = conn.cursor()
         
         create_table_query = f"""
-            CREATE TABLE IF NOT EXISTS hospital_data.{table_name}_id_mapping (
-                id INT,
+            CREATE TABLE IF NOT EXISTS hospital_data.{table_name}_repaired_id_mapping (
+                id STRING,
                 database_name STRING,
                 old_id STRING,
                 new_id STRING,
                 table_name STRING,
-                created_at TIMESTAMP
+                created_at STRING
             ) LOCATION 's3://bk-health-bucket-trusted/' TBLPROPERTIES ('table_type' = 'ICEBERG', 'format' = 'parquet');
         """
-
-        print('create_table_query',create_table_query )
+        print("create_table_query", create_table_query)
         cursor.execute(create_table_query)
-        connection.commit()
+
     except Exception as e:
         logging.error(f"Error creating mapping table: {e}")
     finally:
-        if connection:
-            connection.close()
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
+
+def check_exist_id_mapping(table_name, old_id, new_id):
+    """
+    Kiểm tra xem bản ghi với old_id và new_id có tồn tại trong bảng {table_name}_id_mapping không.
+    
+    Args:
+        table_name (str): Tên bảng (tiền tố trước "_id_mapping").
+        old_id (str): ID cũ cần kiểm tra.
+        new_id (str): ID mới cần kiểm tra.
+    
+    Returns:
+        bool: True nếu bản ghi tồn tại, False nếu không tồn tại.
+    """
+    try:
+        database = os.getenv('S3_DATABASE')
+        region = os.getenv('AWS_REGION')
+        output_bucket = os.getenv('S3_OUTPUT_BUCKET')
+
+        conn = connect(
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+            s3_staging_dir=output_bucket,
+            region_name=region,
+            schema_name=database
+        )
+        cursor = conn.cursor()
+
+        query = f"""
+        SELECT COUNT(*) FROM hospital_data.{table_name}_id_mapping
+        WHERE old_id = '{old_id}' AND new_id = '{new_id}' AND table_name = '{table_name}';
+        """
+        cursor.execute(query)
+        result = cursor.fetchone()
+        
+        return result[0] > 0 if result else False
+    
+    except Exception as e:
+        logging.error(f"Lỗi khi kiểm tra tồn tại ID mapping: {e}")
+        return False
+    
+    finally:
+        if 'cursor' in locals():
+            cursor.close()
+        if 'conn' in locals():
+            conn.close()
+
+
+def generate_insert_query_for_id_mapping(table_name, id_value, database_name, old_id, new_id):
+    """
+    Generate an INSERT INTO query for the {table_name}_id_mapping table.
+
+    Args:
+        table_name (str): The target table name (prefix before "_id_mapping").
+        id_value (int): The ID value.
+        database_name (str): The name of the database.
+        old_id (str): The old identifier.
+        new_id (str): The new identifier.
+
+    Returns:
+        tuple: (INSERT INTO query string, created_at timestamp)
+    """
+    try:
+        created_at = datetime.now().strftime('%Y%m%d%H%M%S')
+
+        # Tên bảng đầy đủ
+        full_table_name = f"hospital_data.{table_name}_id_mapping"
+        
+        # Format giá trị để tránh lỗi SQL
+        database_name_safe = database_name.replace("'", "''") if database_name else None
+        old_id_safe = old_id.replace("'", "''") if old_id else None
+        new_id_safe = new_id.replace("'", "''") if new_id else None
+        table_name_safe = table_name.replace("'", "''")
+        created_at_safe = created_at  # Giữ nguyên nếu không cần xử lý
+
+        formatted_values = [
+            f"'{id_value}'",
+            f"'{database_name_safe}'" if database_name_safe else "NULL",
+            f"'{old_id_safe}'" if old_id_safe else "NULL",
+            f"'{new_id_safe}'" if new_id_safe else "NULL",
+            f"'{table_name_safe}'",
+            f"'{created_at_safe}'"
+        ]
+
+
+        
+        values = ", ".join(formatted_values)
+
+        query = f"""
+        INSERT INTO {full_table_name} (id, database_name, old_id, new_id, table_name, created_at)
+        VALUES ({values});
+        """
+
+        print('query', query)
+        return query.strip()
+
+    except Exception as e:
+        print(f"Eror shrvbskvsivbs INSERT INTO: {e}")
+        return None
 
 def save_error_data(df, database_name, table_name, error_message):
     """Save errored data to error folder"""
@@ -507,7 +639,7 @@ def process_and_insert_data(merged_df, base_name, output_bucket, database, regio
             print(f"ID: {row[0]}, TableReference: {row[1]}, TableWasReference: {row[2]}, PriKey: {row[3]}, FoKey: {row[4]}")
         
         # Create table and insert data
-        insert_query = generate_insert_query_from_db(database, table_name, repaired_df)
+        insert_query, key_id = generate_insert_query_from_db(database, table_name, repaired_df)
         
         cursor.execute(insert_query)
         
@@ -593,40 +725,40 @@ for database_name in os.listdir(data_folder):
 
             base_name = subfolder
 
-            constraint_file = os.path.join(constraint_folder, f'{base_name}_constraints.txt')
+            # constraint_file = os.path.join(constraint_folder, f'{base_name}_constraints.txt')
 
-            if not os.path.exists(constraint_file):
-                print(f"Warning: Constraint file for '{base_name}' not found. Skipping.")
-                continue
+            # if not os.path.exists(constraint_file):
+            #     print(f"Warning: Constraint file for '{base_name}' not found. Skipping.")
+            #     continue
 
-            print(f"Processing dataset: {base_name}")
+            # print(f"Processing dataset: {base_name}")
 
-            2. Load training data và denial constraints
-            print(base_name, merged_file_path)
-            hc.load_data(base_name, merged_file_path)
+            # # 2. Load training data và denial constraints
+            # print(base_name, merged_file_path)
+            # hc.load_data(base_name, merged_file_path)
 
-            hc.load_dcs(constraint_file)
-            hc.ds.set_constraints(hc.get_dcs())
+            # hc.load_dcs(constraint_file)
+            # hc.ds.set_constraints(hc.get_dcs())
 
-            # 3. Detect erroneous cells using these two detectors
-            detectors = [NullDetector(), ViolationDetector()]
-            hc.detect_errors(detectors)
+            # # 3. Detect erroneous cells using these two detectors
+            # detectors = [NullDetector(), ViolationDetector()]
+            # hc.detect_errors(detectors)
 
-            # 4. Repair errors utilizing the defined features
-            hc.setup_domain()
-            featurizers = [
-                InitAttrFeaturizer(),
-                OccurAttrFeaturizer(),
-                FreqFeaturizer(),
-                ConstraintFeaturizer(),
-            ]
-            hc.repair_errors(featurizers)
+            # # 4. Repair errors utilizing the defined features
+            # hc.setup_domain()
+            # featurizers = [
+            #     InitAttrFeaturizer(),
+            #     OccurAttrFeaturizer(),
+            #     FreqFeaturizer(),
+            #     ConstraintFeaturizer(),
+            # ]
+            # hc.repair_errors(featurizers)
 
-            # 5. Evaluate the correctness of the results (optional)
-            # hc.evaluate(fpath='../testdata/inf_values_dom.csv',
-            #             tid_col='tid',
-            #             attr_col='attribute',
-            #             val_col='correct_val')
+            # # 5. Evaluate the correctness of the results (optional)
+            # # hc.evaluate(fpath='../testdata/inf_values_dom.csv',
+            # #             tid_col='tid',
+            # #             attr_col='attribute',
+            # #             val_col='correct_val')
 
             setup_mapping_table(database_name, base_name)
 
