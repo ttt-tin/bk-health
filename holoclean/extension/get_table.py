@@ -14,7 +14,7 @@ glue_client = boto3.client('glue', region_name='ap-southeast-2')
 lake_client = boto3.client('lakeformation', region_name='ap-southeast-2')
 
 # Tên database cần truy cập
-database_name = "bk-health-lakehouse-db"
+database_name = "hospital_data"
 
 # Lấy danh sách bảng trong database
 def list_tables(database_name):
