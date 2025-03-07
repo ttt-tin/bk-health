@@ -350,7 +350,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
 
                             IS_EXIST_RECORD = len(exists_record) > 0
                             print('test 2', table_name, str(uuid.uuid4()), database_name, old_id, exists_record[0])
-                            check_exist = check_exist_id_mapping(table_name, old_id, exists_record[0]['key_id'])
+                            check_exist = check_exist_id_mapping(database_name, table_name, old_id, exists_record[0]['key_id'])
                             if not check_exist:
                                 
                                 mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database_name, old_id, exists_record[0]['key_id'])
@@ -360,7 +360,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     # After CREATE TABLE succeeds, execute INSERT INTO
                     print('test 1')
                     insert_query, key_id = generate_insert_query_from_db(database, table_name, table_structure, record)
-                    check_exist = check_exist_id_mapping(table_name, old_id, key_id)
+                    check_exist = check_exist_id_mapping(database_name, table_name, old_id, key_id)
                     if not check_exist:
                         mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database_name, old_id, key_id)
                         cursor.execute(mapping_id_query)
@@ -418,7 +418,7 @@ def setup_mapping_table(database_name, table_name):
         if 'conn' in locals():
             conn.close()
 
-def check_exist_id_mapping(table_name, old_id, new_id):
+def check_exist_id_mapping(database_name, table_name, old_id, new_id):
     """
     Kiểm tra xem bản ghi với old_id và new_id có tồn tại trong bảng {table_name}_id_mapping không.
     
@@ -446,7 +446,7 @@ def check_exist_id_mapping(table_name, old_id, new_id):
 
         query = f"""
         SELECT COUNT(*) FROM hospital_data.{table_name}_id_mapping
-        WHERE old_id = '{old_id}' AND new_id = '{new_id}' AND table_name = '{table_name}';
+        WHERE old_id = '{old_id}' AND new_id = '{new_id}' AND table_name = '{table_name}' AND database_name = '{database_name}';
         """
         cursor.execute(query)
         result = cursor.fetchone()
@@ -727,34 +727,34 @@ for database_name in os.listdir(data_folder):
 
             base_name = subfolder
 
-            # constraint_file = os.path.join(constraint_folder, f'{base_name}_constraints.txt')
+            constraint_file = os.path.join(constraint_folder, f'{base_name}_constraints.txt')
 
-            # if not os.path.exists(constraint_file):
-            #     print(f"Warning: Constraint file for '{base_name}' not found. Skipping.")
-            #     continue
+            if not os.path.exists(constraint_file):
+                print(f"Warning: Constraint file for '{base_name}' not found. Skipping.")
+                continue
 
-            # print(f"Processing dataset: {base_name}")
+            print(f"Processing dataset: {base_name}")
 
-            # # 2. Load training data và denial constraints
-            # print(base_name, merged_file_path)
-            # hc.load_data(base_name, merged_file_path)
+            # 2. Load training data và denial constraints
+            print(base_name, merged_file_path)
+            hc.load_data(base_name, merged_file_path)
 
-            # hc.load_dcs(constraint_file)
-            # hc.ds.set_constraints(hc.get_dcs())
+            hc.load_dcs(constraint_file)
+            hc.ds.set_constraints(hc.get_dcs())
 
-            # # 3. Detect erroneous cells using these two detectors
-            # detectors = [NullDetector(), ViolationDetector()]
-            # hc.detect_errors(detectors)
+            # 3. Detect erroneous cells using these two detectors
+            detectors = [NullDetector(), ViolationDetector()]
+            hc.detect_errors(detectors)
 
-            # # 4. Repair errors utilizing the defined features
-            # hc.setup_domain()
-            # featurizers = [
-            #     InitAttrFeaturizer(),
-            #     OccurAttrFeaturizer(),
-            #     FreqFeaturizer(),
-            #     ConstraintFeaturizer(),
-            # ]
-            # hc.repair_errors(featurizers)
+            # 4. Repair errors utilizing the defined features
+            hc.setup_domain()
+            featurizers = [
+                InitAttrFeaturizer(),
+                OccurAttrFeaturizer(),
+                FreqFeaturizer(),
+                ConstraintFeaturizer(),
+            ]
+            hc.repair_errors(featurizers)
 
             # # 5. Evaluate the correctness of the results (optional)
             # # hc.evaluate(fpath='../testdata/inf_values_dom.csv',
