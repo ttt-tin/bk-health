@@ -13,6 +13,7 @@ import { HistoryModule } from "./history/history.module";
 import { ExternalVolumeModule } from "./external-volume/external-volume.module";
 import { S3Module } from "./s3/s3.module";
 import { RelationshipModule } from "./relation/relation.module";
+import { ExplorerModule } from "./explorer/explorer.module";
 dotenv.config();
 
 @Module({
@@ -38,6 +39,7 @@ dotenv.config();
     ExternalVolumeModule,
     S3Module,
     RelationshipModule,
+    ExplorerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

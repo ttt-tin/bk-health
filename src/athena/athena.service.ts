@@ -89,7 +89,7 @@ export class AthenaService {
     }
   }
 
-  async executeQuery(query: string, database?: string): Promise<any[]> {
+  async executeQuery(query: string, database?: string, rawOutput = false): Promise<any[]> {
     try {
       const command = new StartQueryExecutionCommand({
         QueryString: query,
@@ -100,45 +100,52 @@ export class AthenaService {
           OutputLocation: `s3://${process.env.AWS_ATHENA_OUTPUT_BUCKET}/athena-results/`,
         },
       });
-
+  
       const response = await this.athenaClient.send(command);
       const queryExecutionId = response.QueryExecutionId!;
-
+  
       if (!queryExecutionId) {
         throw new Error("Failed to start query execution.");
       }
-
+  
       // Wait for query completion
       let status = "RUNNING";
       while (status === "RUNNING" || status === "QUEUED") {
         await new Promise((resolve) => setTimeout(resolve, 2000));
-
+  
         const statusCommand = new GetQueryExecutionCommand({
           QueryExecutionId: queryExecutionId,
         });
-
+  
         const statusResponse = await this.athenaClient.send(statusCommand);
         status = statusResponse.QueryExecution?.Status?.State || "FAILED";
-
+  
         if (status === "FAILED" || status === "CANCELLED") {
           throw new Error(
             `Athena query failed: ${statusResponse.QueryExecution?.Status?.StateChangeReason}`,
           );
         }
       }
-
+  
       // Fetch query results
       const resultsCommand = new GetQueryResultsCommand({
         QueryExecutionId: queryExecutionId,
       });
-
+  
       const resultsResponse = await this.athenaClient.send(resultsCommand);
-
+  
       const rows = resultsResponse.ResultSet?.Rows || [];
       if (rows.length < 2) return []; // No data or just headers
-
+  
+      if (rawOutput) {
+        // Return raw rows without transformation
+        return rows.map((row) => 
+          row.Data?.map((data) => data.VarCharValue || null) || []
+        );
+      }
+  
       const headers = rows[0].Data?.map((col) => col.VarCharValue) || []; // Extract column names
-
+  
       const resultObjects = rows.slice(1).map((row) => {
         const values = row.Data?.map((data) => data.VarCharValue || null) || [];
         return headers.reduce(
@@ -149,13 +156,13 @@ export class AthenaService {
           {} as Record<string, any>,
         );
       });
-
+  
       return resultObjects;
     } catch (err) {
       console.error("Error executing Athena query:", err);
       throw new Error(err.message || "Failed to execute query.");
     }
-  }
+  }  
 
   async updateTableMetadata(
     id: string,
