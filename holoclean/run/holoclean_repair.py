@@ -289,8 +289,9 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     mapping_result = cursor.fetchone()
 
                     if mapping_result:
+                        exists_record = [dict(zip(columns, row)) for row in mapping_result]
                         print(f"Found mapping for record: {record}")
-                        record[relation['foKey']] = mapping_result['new_id']
+                        record[relation['foKey']] = exists_record['new_id']
                     else:
                         # If no mapping data found, add the current record to error_records
                         missing_ref_data.append(record)
@@ -348,10 +349,11 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                             exists_record = [dict(zip(columns, row)) for row in exists_record]  # Dùng dữ liệu đã lấy
 
                             IS_EXIST_RECORD = len(exists_record) > 0
-                            print('test 2', table_name, str(uuid.uuid4()), database, old_id, exists_record[0])
+                            print('test 2', table_name, str(uuid.uuid4()), database_name, old_id, exists_record[0])
                             check_exist = check_exist_id_mapping(table_name, old_id, exists_record[0]['key_id'])
                             if not check_exist:
-                                mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database, old_id, exists_record[0]['key_id'])
+                                
+                                mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database_name, old_id, exists_record[0]['key_id'])
                                 print('mapping_id_query', mapping_id_query)
                                 cursor.execute(mapping_id_query)
                 if not IS_EXIST_RECORD:
@@ -360,7 +362,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     insert_query, key_id = generate_insert_query_from_db(database, table_name, table_structure, record)
                     check_exist = check_exist_id_mapping(table_name, old_id, key_id)
                     if not check_exist:
-                        mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database, old_id, key_id)
+                        mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database_name, old_id, key_id)
                         cursor.execute(mapping_id_query)
                     cursor.execute(insert_query)
 

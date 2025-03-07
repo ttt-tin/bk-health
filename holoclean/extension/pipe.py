@@ -56,7 +56,7 @@ def init_db():
 # List unprocessed files from S3
 def list_unprocessed_files():
     try:
-        response = s3_client.list_objects_v2(Bucket=BUCKET_NAME)
+        response = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix="structure/")
         all_files = [obj['Key'] for obj in response.get('Contents', [])]
         unprocessed_files = []
         
@@ -97,8 +97,13 @@ def download_batch(files):
     
     local_paths = []
     for file_key in files:
+        parts = file_key.split("/")
+        database_name = parts[1]
+        database_dir = os.path.join(save_dir, database_name)
+        os.makedirs(database_dir, exist_ok=True)
+        print('database_name', parts)
         # Lưu tệp vào thư mục 'data/structure'
-        local_path = os.path.join(save_dir, os.path.basename(file_key))
+        local_path = os.path.join(database_dir, os.path.basename(file_key))
         try:
             print(f"Downloading file: {file_key}")
             s3_client.download_file(BUCKET_NAME, file_key, local_path)
@@ -167,17 +172,17 @@ def pipeline():
             time.sleep(POLLING_INTERVAL)
             return
         
-        # # Process files in batches
-        # batch = unprocessed_files[:BATCH_SIZE]
-        # print(f"Processing batch: {batch}")
-        # local_files = download_batch(batch)
+        # Process files in batches
+        batch = unprocessed_files[:BATCH_SIZE]
+        print(f"Processing batch: {batch}")
+        local_files = download_batch(batch)
 
-        # # Mark files as processed (before running extract to avoid duplication)
-        # for file_key in batch:
-        #     mark_file_as_processed(file_key)
+        # Mark files as processed (before running extract to avoid duplication)
+        for file_key in batch:
+            mark_file_as_processed(file_key)
 
-        # # Run extract.py
-        # run_extraction()
+        # Run extract.py
+        run_extraction()
 
         # Run Holoclean
         run_holoclean()
