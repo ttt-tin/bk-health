@@ -263,7 +263,10 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
             """
 
             cursor.execute(select_query)
-            relations = cursor.fetchall()
+            relation_columns = [desc[0] for desc in cursor.description]
+            relations = cursor.fetchall()  # Lấy dữ liệu dạng list(tuple)
+
+            relations_dict = [dict(zip(relation_columns, row)) for row in relations]
             columns = table_structure["columns"]
             records = [dict(zip(columns, record)) for record in table_structure["data"]]
             records_dict = [{key[0]: value for key, value in record.items()} for record in records]
@@ -272,29 +275,37 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
             missing_ref_data = []
             for record in records_dict:
                 print('record', record)
-                for relation in relations:
+                for relation in relations_dict:
                     #####################################
                     # Implement logic update related id #
                     #####################################
+
+                    print('Testtttttt')
+                    print('relations', relation)
 
                     mapping_data_query = f"""
                         SELECT *
                         FROM {database}.{relation['tableWasReference']}_id_mapping
                         WHERE old_id = '{record[relation['foKey']]}'
                         AND database_name = '{database_name}'
-                        AND table_name = '{table_name}'
+                        AND table_name = '{relation['tableWasReference']}'
                     """
 
                     cursor.execute(mapping_data_query)
+                    mapping_columns = [desc[0] for desc in cursor.description]
                     mapping_result = cursor.fetchone()
 
+                    print('mapping_result', mapping_result)
+                    print('mapping_columns', mapping_columns)
                     if mapping_result:
-                        exists_record = [dict(zip(columns, row)) for row in mapping_result]
+                        exists_record = dict(zip(mapping_columns, mapping_result))
+                        print('exists_record', exists_record)
                         print(f"Found mapping for record: {record}")
                         record[relation['foKey']] = exists_record['new_id']
                     else:
                         # If no mapping data found, add the current record to error_records
                         missing_ref_data.append(record)
+                        continue
 
                 #########################################
                 # Implement logic to check exist record #
@@ -569,118 +580,118 @@ def get_db_connection():
         port=port
     )
 
-def process_and_insert_data(merged_df, base_name, output_bucket, database, region):
-    """Process data and insert with mapping"""
-    try:
-        # Process with HoloClean
-        hc.load_data(base_name, merged_df)
-        hc.load_dcs(os.path.join(constraint_folder, f'{base_name}_constraints.txt'))
-        hc.ds.set_constraints(hc.get_dcs())
+# def process_and_insert_data(merged_df, base_name, output_bucket, database, region):
+#     """Process data and insert with mapping"""
+#     try:
+#         # Process with HoloClean
+#         hc.load_data(base_name, merged_df)
+#         hc.load_dcs(os.path.join(constraint_folder, f'{base_name}_constraints.txt'))
+#         hc.ds.set_constraints(hc.get_dcs())
         
-        detectors = [NullDetector(), ViolationDetector()]
-        hc.detect_errors(detectors)
+#         detectors = [NullDetector(), ViolationDetector()]
+#         hc.detect_errors(detectors)
         
-        featurizers = [
-            InitAttrFeaturizer(),
-            OccurAttrFeaturizer(),
-            FreqFeaturizer(),
-            ConstraintFeaturizer(),
-        ]
-        hc.repair_errors(featurizers)
+#         featurizers = [
+#             InitAttrFeaturizer(),
+#             OccurAttrFeaturizer(),
+#             FreqFeaturizer(),
+#             ConstraintFeaturizer(),
+#         ]
+#         hc.repair_errors(featurizers)
         
-        # Get processed data
-        repaired_df = hc.get_repaired_dataframe()
+#         # Get processed data
+#         repaired_df = hc.get_repaired_dataframe()
         
-        # Update relation IDs
-        repaired_df = update_relation_ids(repaired_df, base_name)
+#         # Update relation IDs
+#         repaired_df = update_relation_ids(repaired_df, base_name)
         
-        # Save mapping
-        connection = get_db_connection()
-        cursor = connection.cursor()
+#         # Save mapping
+#         connection = get_db_connection()
+#         cursor = connection.cursor()
         
-        # Assuming there's an 'id' column in the original data
-        if 'id' in repaired_df.columns:
-            for _, row in repaired_df.iterrows():
-                old_id = row['id']
-                new_id = str(uuid.uuid4())  # Generate new UUID
-                cursor.execute("""
-                    INSERT INTO id_mapping (database_name, old_id, new_id, table_name)
-                    VALUES (%s, %s, %s, %s)
-                """, (database, old_id, new_id, base_name))
-                repaired_df.loc[repaired_df['id'] == old_id, 'id'] = new_id
+#         # Assuming there's an 'id' column in the original data
+#         if 'id' in repaired_df.columns:
+#             for _, row in repaired_df.iterrows():
+#                 old_id = row['id']
+#                 new_id = str(uuid.uuid4())  # Generate new UUID
+#                 cursor.execute("""
+#                     INSERT INTO id_mapping (database_name, old_id, new_id, table_name)
+#                     VALUES (%s, %s, %s, %s)
+#                 """, (database, old_id, new_id, base_name))
+#                 repaired_df.loc[repaired_df['id'] == old_id, 'id'] = new_id
         
-        # Insert to Athena
-        conn = connect(
-            aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
-            s3_staging_dir=output_bucket,
-            region_name=region,
-            schema_name=database
-        )
+#         # Insert to Athena
+#         conn = connect(
+#             aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+#             aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+#             s3_staging_dir=output_bucket,
+#             region_name=region,
+#             schema_name=database
+#         )
         
-        cursor = conn.cursor()
-        table_name = f'{base_name}_repaired'
+#         cursor = conn.cursor()
+#         table_name = f'{base_name}_repaired'
 
-        create_query = generate_create_table_query_from_db(database, table_name, repaired_df)
-        cursor.execute(create_query)
+#         create_query = generate_create_table_query_from_db(database, table_name, repaired_df)
+#         cursor.execute(create_query)
 
-        select_query = f"""
-            SELECT 
-                id,
-                table_reference AS tableReference,
-                table_was_reference AS tableWasReference,
-                pri_key AS priKey,
-                fo_key AS foKey
-            FROM {database}.relationships
-            WHERE table_reference = '{base_name}'
-        """
+#         select_query = f"""
+#             SELECT 
+#                 id,
+#                 table_reference AS tableReference,
+#                 table_was_reference AS tableWasReference,
+#                 pri_key AS priKey,
+#                 fo_key AS foKey
+#             FROM {database}.relationships
+#             WHERE table_reference = '{base_name}'
+#         """
 
-        cursor.execute(select_query)
-        rows = cursor.fetchall()
-        for row in rows:
-            print(f"ID: {row[0]}, TableReference: {row[1]}, TableWasReference: {row[2]}, PriKey: {row[3]}, FoKey: {row[4]}")
+#         cursor.execute(select_query)
+#         rows = cursor.fetchall()
+#         for row in rows:
+#             print(f"ID: {row[0]}, TableReference: {row[1]}, TableWasReference: {row[2]}, PriKey: {row[3]}, FoKey: {row[4]}")
         
-        # Create table and insert data
-        insert_query, key_id = generate_insert_query_from_db(database, table_name, repaired_df)
+#         # Create table and insert data
+#         insert_query, key_id = generate_insert_query_from_db(database, table_name, repaired_df)
         
-        cursor.execute(insert_query)
+#         cursor.execute(insert_query)
         
-        connection.commit()
-        logging.info(f"Successfully processed and inserted data for {base_name}")
-        print(f"Processed database: {database}, table: {table_name}")
+#         connection.commit()
+#         logging.info(f"Successfully processed and inserted data for {base_name}")
+#         print(f"Processed database: {database}, table: {table_name}")
         
-    except Exception as e:
-        error_file = save_error_data(repaired_df, database, base_name, str(e))
-        logging.error(f"Error processing {base_name}: {e}")
-    finally:
-        if connection:
-            connection.close()
+#     except Exception as e:
+#         error_file = save_error_data(repaired_df, database, base_name, str(e))
+#         logging.error(f"Error processing {base_name}: {e}")
+#     finally:
+#         if connection:
+#             connection.close()
 
-def cron_job_reprocess_errors():
-    """Cron job to reprocess error data"""
-    for database_name in os.listdir(error_folder):
-        db_path = os.path.join(error_folder, database_name)
-        if not os.path.isdir(db_path):
-            continue
+# def cron_job_reprocess_errors():
+#     """Cron job to reprocess error data"""
+#     for database_name in os.listdir(error_folder):
+#         db_path = os.path.join(error_folder, database_name)
+#         if not os.path.isdir(db_path):
+#             continue
             
-        for table_name in os.listdir(db_path):
-            table_path = os.path.join(db_path, table_name)
-            for error_file in os.listdir(table_path):
-                file_path = os.path.join(table_path, error_file)
+#         for table_name in os.listdir(db_path):
+#             table_path = os.path.join(db_path, table_name)
+#             for error_file in os.listdir(table_path):
+#                 file_path = os.path.join(table_path, error_file)
                 
-                try:
-                    df = pd.read_csv(file_path)
-                    output_bucket = os.getenv('S3_OUTPUT_BUCKET')
-                    region = os.getenv('AWS_REGION')
+#                 try:
+#                     df = pd.read_csv(file_path)
+#                     output_bucket = os.getenv('S3_OUTPUT_BUCKET')
+#                     region = os.getenv('AWS_REGION')
                     
-                    process_and_insert_data(df, table_name, output_bucket, database_name, region)
+#                     process_and_insert_data(df, table_name, output_bucket, database_name, region)
                     
-                    # If successful, remove the error file
-                    os.remove(file_path)
-                    logging.info(f"Successfully reprocessed and removed {file_path}")
-                except Exception as e:
-                    logging.error(f"Failed to reprocess {file_path}: {e}")
-# Main execution
+#                     # If successful, remove the error file
+#                     os.remove(file_path)
+#                     logging.info(f"Successfully reprocessed and removed {file_path}")
+#                 except Exception as e:
+#                     logging.error(f"Failed to reprocess {file_path}: {e}")
+# # Main execution
 
 def merge_csv_files_in_folder(folder_path):
     """
@@ -734,6 +745,7 @@ for database_name in os.listdir(data_folder):
                 continue
 
             print(f"Processing dataset: {base_name}")
+            print(f"Processing onstraint: {constraint_file}")
 
             # 2. Load training data và denial constraints
             print(base_name, merged_file_path)
