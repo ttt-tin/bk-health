@@ -1,3 +1,5 @@
+import json
+import boto3
 import logging
 import os
 import re
@@ -19,26 +21,26 @@ data_folder = 'standard'
 constraint_folder = 'constraint'
 s3_output_database = os.getenv('S3_DATABASE')
 
-# 1. Setup a HoloClean session
-hc = holoclean.HoloClean(
-    db_name='holo',
-    domain_thresh_1=0,
-    domain_thresh_2=0,
-    weak_label_thresh=0.99,
-    max_domain=10000,
-    cor_strength=0.6,
-    nb_cor_strength=0.8,
-    epochs=10,
-    weight_decay=0.01,
-    learning_rate=0.001,
-    threads=1,
-    batch_size=1,
-    verbose=True,
-    timeout=3*60000,
-    feature_norm=False,
-    weight_norm=False,
-    print_fw=True
-).session
+# # 1. Setup a HoloClean session
+# hc = holoclean.HoloClean(
+#     db_name='holo',
+#     domain_thresh_1=0,
+#     domain_thresh_2=0,
+#     weak_label_thresh=0.99,
+#     max_domain=10000,
+#     cor_strength=0.6,
+#     nb_cor_strength=0.8,
+#     epochs=10,
+#     weight_decay=0.01,
+#     learning_rate=0.001,
+#     threads=1,
+#     batch_size=1,
+#     verbose=True,
+#     timeout=3*60000,
+#     feature_norm=False,
+#     weight_norm=False,
+#     print_fw=True
+# ).session
 
 if not os.path.exists(data_folder):
     print(f"Error: Data folder '{data_folder}' does not exist.")
@@ -273,40 +275,120 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
 
             # records = table_structure['data']
             missing_ref_data = []
+            missing_table_ref = False
             for record in records_dict:
                 print('record', record)
                 for relation in relations_dict:
                     #####################################
                     # Implement logic update related id #
                     #####################################
+                    try:
+                        mapping_data_query = f"""
+                            SELECT *
+                            FROM {database}.{relation['tableWasReference']}_id_mapping
+                            WHERE old_id = '{record[relation['foKey']]}'
+                            AND database_name = '{database_name}'
+                            AND table_name = '{relation['tableWasReference']}'
+                        """
 
-                    print('Testtttttt')
-                    print('relations', relation)
+                        cursor.execute(mapping_data_query)
+                        mapping_columns = [desc[0] for desc in cursor.description]
+                        mapping_result = cursor.fetchone()
 
-                    mapping_data_query = f"""
-                        SELECT *
-                        FROM {database}.{relation['tableWasReference']}_id_mapping
-                        WHERE old_id = '{record[relation['foKey']]}'
-                        AND database_name = '{database_name}'
-                        AND table_name = '{relation['tableWasReference']}'
-                    """
+                        print('mapping_result', mapping_result)
+                        print('mapping_columns', mapping_columns)
+                        if mapping_result and len(mapping_result) > 0:
+                            exists_record = dict(zip(mapping_columns, mapping_result))
+                            print('exists_record', exists_record)
+                            print(f"Found mapping for record: {record}")
+                            record[relation['foKey']] = exists_record['new_id']
+                        else:
+                            # If no mapping data found, add the current record to error_records
+                            missing_ref_data.append(record)
+                            missing_table_ref = True
+                            continue
+                    except Exception as e:
+                        print('Error', e)
+                        print('Error', e)
+                        current_date = datetime.now().strftime('%Y/%m/%d')
+                        s3_client = boto3.client(
+                            's3',
+                            aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+                            aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+                            region_name=os.getenv('AWS_REGION')
+                        )
+                        bucket_name = 'bk-health-bucket-landing'
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        s3_path = f"error_data/{database_name}/{table_name}/{current_date}/error_log_{timestamp}.json"
 
-                    cursor.execute(mapping_data_query)
-                    mapping_columns = [desc[0] for desc in cursor.description]
-                    mapping_result = cursor.fetchone()
+                        print("AWS_ACCESS_KEY:", os.getenv('AWS_ACCESS_KEY'))
+                        print("AWS_SECRET_KEY:", os.getenv('AWS_SECRET_KEY'))
+                        print("AWS_REGION:", os.getenv('AWS_REGION'))
 
-                    print('mapping_result', mapping_result)
-                    print('mapping_columns', mapping_columns)
-                    if mapping_result:
-                        exists_record = dict(zip(mapping_columns, mapping_result))
-                        print('exists_record', exists_record)
-                        print(f"Found mapping for record: {record}")
-                        record[relation['foKey']] = exists_record['new_id']
-                    else:
-                        # If no mapping data found, add the current record to error_records
-                        missing_ref_data.append(record)
-                        continue
 
+                        # Convert data thành JSON
+                        error_data_json = json.dumps(records_dict, indent=4)
+
+                        # Upload file lên S3
+                        s3_client.put_object(Bucket=bucket_name, Key=s3_path, Body=error_data_json)
+                        return False
+                if missing_table_ref:
+                    try:
+                        get_mapping_data_query = f"""
+                            SELECT *
+                            FROM {database}.{relation['tableWasReference']}_id_mapping
+                        """
+
+                        cursor.execute(get_mapping_data_query)
+                        mapping_columns = [desc[0] for desc in cursor.description]
+                        mapping_result = cursor.fetchone()
+                        if not mapping_result or len(mapping_result) < 1:
+                            current_date = datetime.now().strftime('%Y/%m/%d')
+                            s3_client = boto3.client(
+                                's3',
+                                aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+                                aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+                                region_name=os.getenv('AWS_REGION')
+                            )
+                            bucket_name = 'bk-health-bucket-landing'
+                            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                            s3_path = f"error_data/{database_name}/{table_name}/{current_date}/error_log_{timestamp}.json"
+
+                            print("AWS_ACCESS_KEY:", os.getenv('AWS_ACCESS_KEY'))
+                            print("AWS_SECRET_KEY:", os.getenv('AWS_SECRET_KEY'))
+                            print("AWS_REGION:", os.getenv('AWS_REGION'))
+
+
+                            # Convert data thành JSON
+                            error_data_json = json.dumps(records_dict, indent=4)
+
+                            # Upload file lên S3
+                            s3_client.put_object(Bucket=bucket_name, Key=s3_path, Body=error_data_json)
+                            return False
+                    except Exception as e:
+                        print('Error', e)
+                        current_date = datetime.now().strftime('%Y/%m/%d')
+                        s3_client = boto3.client(
+                            's3',
+                            aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+                            aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+                            region_name=os.getenv('AWS_REGION')
+                        )
+                        bucket_name = 'bk-health-bucket-landing'
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        s3_path = f"error_data/{database_name}/{table_name}/{current_date}/error_log_{timestamp}.json"
+
+                        print("AWS_ACCESS_KEY:", os.getenv('AWS_ACCESS_KEY'))
+                        print("AWS_SECRET_KEY:", os.getenv('AWS_SECRET_KEY'))
+                        print("AWS_REGION:", os.getenv('AWS_REGION'))
+
+
+                        # Convert data thành JSON
+                        error_data_json = json.dumps(records_dict, indent=4)
+
+                        # Upload file lên S3
+                        s3_client.put_object(Bucket=bucket_name, Key=s3_path, Body=error_data_json)
+                        return False
                 #########################################
                 # Implement logic to check exist record #
                 #########################################
@@ -322,18 +404,49 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                 cursor.execute(get_key_query)
                 keys_unique = cursor.fetchall()
 
+                if len(keys_unique) == 0:
+                    insert_key_query = f"""
+                        INSERT INTO hospital_data.tables (id, table_name, column_name) VALUES 
+                        ('{str(uuid.uuid4())}', '{table_name}', 'id');
+                    """
+                    cursor.execute(insert_key_query)
+
+                    get_key_query = f"""
+                    SELECT 
+                        *
+                    FROM {database}.tables
+                    WHERE table_name = '{table_name}'
+                    """
+
+                    cursor.execute(get_key_query)
+                    keys_unique = cursor.fetchall()
+
+
                 IS_EXIST_RECORD = False
 
-                print('keys_unique', keys_unique[0][2])
-                old_id = None
 
+                print('keys_unique', keys_unique)
+                old_id = record['id']
+
+                record = {key.lower(): value for key, value in record.items()}
+                IS_EXIST_RECORD = False
                 for key_unique in keys_unique:
-                    parts = [p.strip() for p in key_unique[2].split(",")]
-                    if len(parts) == 1:
-                        old_id = record[parts[0]]
+                    try:
+                        parts = [p.strip() for p in key_unique[2].split(",")]
+                        if (not old_id) and parts and len(parts) == 1:
+                            part = parts[0].lower()
+                            old_id = record[part]
+                    except Exception as e:
+                        print('record', record)
+                        print('part', part)
+                        print('parts', parts)
+                        print('checkkkkkk', record[parts[0]])
+                        print(f"Errrrrrrrrrrrrrrrrrr: {e}")
+                        return
                     where = ''
                     for part in parts:
                         try:
+                            part = part.lower()
                             if (record[part]):
                                 print('record', record)
                                 if len(where) == 0:
@@ -351,24 +464,38 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     WHERE {where}
                     """
 
-                    if (len(where)):
-                        print('exist_record_query', exist_record_query)
-                        cursor.execute(exist_record_query)
-                        exists_record = cursor.fetchall()  # Chỉ gọi fetchall() 1 lần
-                        if exists_record:
-                            columns = [desc[0] for desc in cursor.description]
-                            exists_record = [dict(zip(columns, row)) for row in exists_record]  # Dùng dữ liệu đã lấy
+                    try:
+                        if (len(where)):
+                            print('exist_record_query', exist_record_query)
+                            cursor.execute(exist_record_query)
+                            exists_record = cursor.fetchall()  # Chỉ gọi fetchall() 1 lần
+                            print('exists_record', exists_record)
+                            print('Debug 0', where)
 
-                            IS_EXIST_RECORD = len(exists_record) > 0
-                            print('test 2', table_name, str(uuid.uuid4()), database_name, old_id, exists_record[0])
-                            check_exist = check_exist_id_mapping(database_name, table_name, old_id, exists_record[0]['key_id'])
-                            if not check_exist:
-                                
-                                mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database_name, old_id, exists_record[0]['key_id'])
-                                print('mapping_id_query', mapping_id_query)
-                                cursor.execute(mapping_id_query)
+                            if exists_record and len(exists_record) > 0:
+                                IS_EXIST_RECORD = True
+                                print('Debug 1')
+                                columns = [desc[0] for desc in cursor.description]
+                                exists_record = [dict(zip(columns, row)) for row in exists_record]  # Dùng dữ liệu đã lấy
+                                print('Debug 2')
+
+                                print('IS_EXIST_RECORD', IS_EXIST_RECORD)
+                                print('test 2', table_name, str(uuid.uuid4()), database_name, old_id, exists_record[0])
+                                print('Debug 3')
+                                check_exist = check_exist_id_mapping(database_name, table_name, old_id, exists_record[0]['key_id'])
+                                if not check_exist:
+                                    
+                                    mapping_id_query = generate_insert_query_for_id_mapping(table_name, str(uuid.uuid4()), database_name, old_id, exists_record[0]['key_id'])
+                                    print('mapping_id_query', mapping_id_query)
+                                    cursor.execute(mapping_id_query)
+
+                    except Exception as e:
+                        print(f"Error in get data: {e}")
+                print('Debug 4')
+                
                 if not IS_EXIST_RECORD:
                     # After CREATE TABLE succeeds, execute INSERT INTO
+                    print('Debug 5')
                     print('test 1')
                     insert_query, key_id = generate_insert_query_from_db(database, table_name, table_structure, record)
                     check_exist = check_exist_id_mapping(database_name, table_name, old_id, key_id)
@@ -378,6 +505,30 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     cursor.execute(insert_query)
 
             print("Data inserted successfully.")
+
+            current_date = datetime.now().strftime('%Y/%m/%d')
+            s3_client = boto3.client(
+                's3',
+                aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+                aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+                region_name=os.getenv('AWS_REGION')
+            )
+            bucket_name = 'bk-health-bucket-landing'
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            s3_path = f"error_data/{database_name}/{table_name}/{current_date}/error_log_{timestamp}.json"
+
+            # Convert data thành JSON
+            error_data_json = json.dumps(missing_ref_data, indent=4)
+
+            print("AWS_ACCESS_KEY:", os.getenv('AWS_ACCESS_KEY'))
+            print("AWS_SECRET_KEY:", os.getenv('AWS_SECRET_KEY'))
+            print("AWS_REGION:", os.getenv('AWS_REGION'))
+
+            # Upload file lên S3
+            s3_client.put_object(Bucket=bucket_name, Key=s3_path, Body=error_data_json)
+
+            return False
+
         
         except Exception as e:
             print(f"Error occurred: {e}")
@@ -722,6 +873,29 @@ for database_name in os.listdir(data_folder):
     print(f"Processing database: {database_name}")
     
     for subfolder in os.listdir(database_path):
+
+
+        # 1. Setup a HoloClean session
+        hc = holoclean.HoloClean(
+            db_name='holo',
+            domain_thresh_1=0,
+            domain_thresh_2=0,
+            weak_label_thresh=0.99,
+            max_domain=10000,
+            cor_strength=0.6,
+            nb_cor_strength=0.8,
+            epochs=10,
+            weight_decay=0.01,
+            learning_rate=0.001,
+            threads=1,
+            batch_size=1,
+            verbose=True,
+            timeout=3*60000,
+            feature_norm=False,
+            weight_norm=False,
+            print_fw=True
+        ).session
+
         subfolder_path = os.path.join(database_path, subfolder)
         
         if not os.path.isdir(subfolder_path):

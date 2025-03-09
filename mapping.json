@@ -1,52 +1,41 @@
 {
   "tables": [
     {
-      "source_table": "hospital",
+      "source_table": "patient_repaired",
       "mapping": {
-        "ProviderNumber": "ProviderNumber",
-        "HospitalName": "HospitalName",
-        "Address1": "Address1",
-        "Address2": "Address2",
-        "Address3": "Address3",
-        "City": "City",
-        "State": "State",
-        "ZipCode": "ZipCode",
-        "CountyName": "CountyName",
-        "PhoneNumber": "PhoneNumber",
-        "HospitalType": "HospitalType",
-        "HospitalOwner": "HospitalOwner",
-        "EmergencyService": "EmergencyService",
-        "Condition": "Condition",
-        "MeasureCode": "MeasureCode",
-        "MeasureName": "MeasureName",
-        "Score": "Score",
-        "Sample": "Sample",
-        "Stateavg": "Stateavg"
+        "fullurl": "fullUrl",
+        "gender": "gender",
+        "birthdate": "birthDate",
+        "id": "id",
+        "addressstate": "address_state",
+        "maritalstatus": "maritalStatus",
+        "multiplebirthboolean": "multipleBirthBoolean",
+        "deceaseddatetime": "deceasedDatetime",
+        "key_id": "key_id",
+        "_tid_": "_tid_",
+        "addresscity": "address_city",
+        "addressline": "address_line",
+        "telecomsystem": "telecom_system",
+        "telecomvalue": "telecom_value",
+        "addresspostalcode": "address_postalCode",
+        "telecomuse": "telecom_use",
+        "nameuse": "name_use",
+        "namefamily": "name_family",
+        "namegiven": "name_given",
+        "nameprefix": "name_prefix"
       }
     },
     {
-      "source_table": "patient",
+      "source_table": "appointment_repaired",
       "mapping": {
-        "gender": "gender",
-        "birthDate": "birthDate",
-        "maritalStatus": "maritalStatus",
-        "multipleBirthBoolean": "multipleBirthBoolean",
-        "addressState": "address_state",
-        "id": "id",
-        "addressCity": "address_city",
-        "fullUrl": "fullUrl",
-        "deceasedDateTime": "deceasedDateTime",
-        "addressLine": "address_line",
-        "addressPostalCode": "address_postalCode",
-        "telecomSystem": "telecom_system",
-        "telecomValue": "telecom_value",
-        "telecomUse": "telecom_use",
-        "nameUse": "name_use",
-        "nameFamily": "name_family",
-        "nameGiven": "name_given",
-        "namePrefix": "name_prefix"
+        "patient_id": "patient_id",
+        "appointment_time": "appointment_time",
+        "appointment_id": "appointment_id",
+        "appointment_date": "appointment_date",
+        "reason": "reason",
+        "status": "status"
       }
     }
   ],
-  "database": "public"
+  "database": "hospital_data"
 }
