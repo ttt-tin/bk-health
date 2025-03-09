@@ -97,7 +97,7 @@ export class AthenaService {
           Database: database ? database : "hospital_data",
         },
         ResultConfiguration: {
-          OutputLocation: `s3://${process.env.AWS_ATHENA_OUTPUT_BUCKET}/athena-results/`,
+          OutputLocation: `${process.env.S3_OUTPUT_BUCKET}/athena-results/`,
         },
       });
   
@@ -197,7 +197,7 @@ export class AthenaService {
         Database: database,
       },
       ResultConfiguration: {
-        OutputLocation: `s3://${process.env.AWS_ATHENA_OUTPUT_BUCKET}`,
+        OutputLocation: `${process.env.S3_OUTPUT_BUCKET}`,
       },
     });
 

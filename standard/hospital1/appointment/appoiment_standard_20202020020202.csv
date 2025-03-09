@@ -1,5 +1,0 @@
-appointment_id,patient_id,appointment_date,appointment_time,reason,status
-a1,c9daebf4-fff4-4552-a460-0bea7c8c84c4,3/10/2025,10:30,Regular Checkup,Confirmed
-a2,07aa2df7-33ee-4e9c-b44c-0fcf794742ef,3/12/2025,14:00,Fever,Pending
-a3,c9daebf4-fff4-4552-a460-0bea7c8c84cesgssd,3/15/2025,9:00,Blood Test,Cancelled
-a4,07aa2df7-33ee-4e9c-b44c-0fcf794742ghsfgg,3/18/2025,16:00,Follow-up,Confirmed

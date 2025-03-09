@@ -249,99 +249,103 @@ def save_csv_to_folder(dataframe, unique_name, base_name, output_folder):
 
 def main():
     try:
-        for dirname, list_folder, filenames in os.walk('data/structure'):
-            file_path_list = []
-            csv_files = []
-            folder_structure = []
-            print('dirname', dirname, list_folder, filenames)
-            if len(list_folder) == 1:
-                folder_structure = list_folder[0]
-                for filename in filenames:
-                    # Add condition to filter only .json files
-                    if filename.endswith('.json'):
-                        file_path_list.append((dirname, filename))
-                    elif filename.endswith('.csv'):
-                        csv_files.append((dirname, filename))
-        
-                metadata_df = pd.DataFrame(file_path_list, columns=["folder", "file"])
-                metadata_df["group"] = metadata_df["folder"].apply(lambda x: extractGroup(x))
-                metadata_df["subgroup"] = metadata_df["folder"].apply(lambda x: extractSubgroup(x))
-                metadata_df = metadata_df[["folder", "group", "subgroup", "file"]]
-                sel_index = list(metadata_df.group.value_counts()[0:2].index)
-                group_df = metadata_df.loc[metadata_df.group.isin(sel_index)]
-                
-                # Initialize empty DataFrames
-                patient_df = pd.DataFrame() 
-                careplan_df = pd.DataFrame() 
-                condition_df = pd.DataFrame() 
-                diagnostic_report_df = pd.DataFrame() 
-                encounter_df = pd.DataFrame() 
-                immunization_df = pd.DataFrame() 
-                observation_df = pd.DataFrame() 
-                procedure_df = pd.DataFrame() 
-                
-                # Process files
-                for index, row in tqdm(group_df.iterrows(), total=group_df.shape[0]):
-                    folder = row["folder"]
-                    file = row["file"]
-                    # Only process if the file is a .json file
-                    if file.endswith('.json'):
-                        sample_df = pd.read_json(os.path.join(folder, file))
-                        patient_df,\
-                        careplan_df,\
-                        condition_df,\
-                        diagnostic_report_df,\
-                        encounter_df,\
-                        immunization_df,\
-                        observation_df,\
-                        procedure_df = processOneFile(sample_df, patient_df,
-                                                    careplan_df,
-                                                    condition_df,
-                                                    diagnostic_report_df,
-                                                    encounter_df,
-                                                    immunization_df,
-                                                    observation_df,
-                                                    procedure_df)
-                
-                # Clean and rename columns
-                patient_df, careplan_df, condition_df, diagnostic_report_df, encounter_df, immunization_df, observation_df, procedure_df = cleanAndRename(
-                    patient_df, careplan_df, condition_df, diagnostic_report_df, encounter_df, immunization_df, observation_df, procedure_df
-                )
-                
-                # Save each DataFrame to a separate CSV file
-                output_folder = "./output/" + folder_structure
-                print('folder_structure', folder_structure)
-                os.makedirs(output_folder, exist_ok=True)  # Ensure output folder exists
+        for dirname, _, filenames in os.walk('data/structure'):
+            try:
+                file_path_list = []
+                csv_files = []
+                folder_structure = []
+                print('dirname', dirname)
+                parts = dirname.split("/")
+                if len(parts) == 3:
+                    folder_structure = parts[2]
+                    for filename in filenames:
+                        # Add condition to filter only .json files
+                        if filename.endswith('.json'):
+                            file_path_list.append((dirname, filename))
+                        elif filename.endswith('.csv'):
+                            csv_files.append((dirname, filename))
+            
+                    metadata_df = pd.DataFrame(file_path_list, columns=["folder", "file"])
+                    metadata_df["group"] = metadata_df["folder"].apply(lambda x: extractGroup(x))
+                    metadata_df["subgroup"] = metadata_df["folder"].apply(lambda x: extractSubgroup(x))
+                    metadata_df = metadata_df[["folder", "group", "subgroup", "file"]]
+                    sel_index = list(metadata_df.group.value_counts()[0:2].index)
+                    group_df = metadata_df.loc[metadata_df.group.isin(sel_index)]
 
-                for folder, filename in csv_files:
-                    src_path = os.path.join(folder, filename)
-                    dest_path = os.path.join(output_folder, filename)
-                    shutil.copy(src_path, dest_path)
-                    print(f"Copied CSV file: {src_path} -> {dest_path}")
-                
-                save_csv_to_folder(patient_df, "patient", "patient_data", output_folder)
-                save_csv_to_folder(careplan_df, "careplan", "careplan_data", output_folder)
-                save_csv_to_folder(condition_df, "condition", "condition_data", output_folder)
-                save_csv_to_folder(diagnostic_report_df, "diagnostic_report", "diagnostic_report_data", output_folder)
-                save_csv_to_folder(encounter_df, "encounter", "encounter_data", output_folder)
-                save_csv_to_folder(immunization_df, "immunization", "immunization_data", output_folder)
-                save_csv_to_folder(observation_df, "observation", "observation_data", output_folder)
-                save_csv_to_folder(procedure_df, "procedure", "procedure_data", output_folder)
-                
-                additional_data_path = "./data/unstructure"
-                generateUnstructuredMetadata(additional_data_path, output_folder)
-                
-                print("All DataFrames have been exported as CSV files in the 'output' folder.")
-                aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-                aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
-                region_name=os.getenv('AWS_REGION')
+                    # Initialize empty DataFrames
+                    patient_df = pd.DataFrame() 
+                    careplan_df = pd.DataFrame() 
+                    condition_df = pd.DataFrame() 
+                    diagnostic_report_df = pd.DataFrame() 
+                    encounter_df = pd.DataFrame() 
+                    immunization_df = pd.DataFrame() 
+                    observation_df = pd.DataFrame() 
+                    procedure_df = pd.DataFrame() 
+                    
+                    # Process files
+                    for index, row in tqdm(group_df.iterrows(), total=group_df.shape[0]):
+                        folder = row["folder"]
+                        file = row["file"]
+                        # Only process if the file is a .json file
+                        if file.endswith('.json'):
+                            sample_df = pd.read_json(os.path.join(folder, file))
+                            patient_df,\
+                            careplan_df,\
+                            condition_df,\
+                            diagnostic_report_df,\
+                            encounter_df,\
+                            immunization_df,\
+                            observation_df,\
+                            procedure_df = processOneFile(sample_df, patient_df,
+                                                        careplan_df,
+                                                        condition_df,
+                                                        diagnostic_report_df,
+                                                        encounter_df,
+                                                        immunization_df,
+                                                        observation_df,
+                                                        procedure_df)
+                    
+                    # Clean and rename columns
+                    patient_df, careplan_df, condition_df, diagnostic_report_df, encounter_df, immunization_df, observation_df, procedure_df = cleanAndRename(
+                        patient_df, careplan_df, condition_df, diagnostic_report_df, encounter_df, immunization_df, observation_df, procedure_df
+                    )
+                    
+                    # Save each DataFrame to a separate CSV file
+                    output_folder = "./output/" + folder_structure
+                    print('folder_structure', folder_structure)
+                    os.makedirs(output_folder, exist_ok=True)  # Ensure output folder exists
 
-                # # Ví dụ sử dụng hàm
-                input_folder_path = "./output"
-                mapping_json_path = "mapping.json"
-                map_all_tables_from_folder(input_folder_path, mapping_json_path)
+                    for folder, filename in csv_files:
+                        src_path = os.path.join(folder, filename)
+                        dest_path = os.path.join(output_folder, filename)
+                        shutil.copy(src_path, dest_path)
+                        print(f"Copied CSV file: {src_path} -> {dest_path}")
+                    
+                    save_csv_to_folder(patient_df, "patient", "patient_data", output_folder)
+                    save_csv_to_folder(careplan_df, "careplan", "careplan_data", output_folder)
+                    save_csv_to_folder(condition_df, "condition", "condition_data", output_folder)
+                    save_csv_to_folder(diagnostic_report_df, "diagnostic_report", "diagnostic_report_data", output_folder)
+                    save_csv_to_folder(encounter_df, "encounter", "encounter_data", output_folder)
+                    save_csv_to_folder(immunization_df, "immunization", "immunization_data", output_folder)
+                    save_csv_to_folder(observation_df, "observation", "observation_data", output_folder)
+                    save_csv_to_folder(procedure_df, "procedure", "procedure_data", output_folder)
+                    
+                    additional_data_path = "./data/unstructure"
+                    generateUnstructuredMetadata(additional_data_path, output_folder)
+                    
+                    print("All DataFrames have been exported as CSV files in the 'output' folder.")
+                    aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+                    aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+                    region_name=os.getenv('AWS_REGION')
 
-                upload_file_to_nestjs_api('./standard', 'bk-health-bucket-raw')
+                    # # Ví dụ sử dụng hàm
+                    input_folder_path = "./output"
+                    mapping_json_path = "mapping.json"
+                    map_all_tables_from_folder(input_folder_path, mapping_json_path)
+
+                    upload_file_to_nestjs_api('./standard', 'bk-health-bucket-raw')
+            except Exception as e:
+                print(f"Error processing: {e}")
 
     except Exception as e:
         print(f"Error processing: {e}")

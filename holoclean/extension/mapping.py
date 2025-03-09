@@ -20,10 +20,9 @@ def map_all_tables_from_folder(input_folder, mapping_json):
         with open(mapping_json, 'r') as f:
             mapping_data = json.load(f)
 
-        print(mapping_data)
-
         # Lấy thông tin mapping của database duy nhất
         db_mapping = mapping_data  # Giả sử chỉ có một database
+        print('db_mapping', db_mapping['database'])
 
         if not db_mapping:
             raise ValueError("Không tìm thấy thông tin mapping cho database.")
@@ -41,9 +40,21 @@ def map_all_tables_from_folder(input_folder, mapping_json):
                         source_table_name = re.sub(r'_data_\d{14}$', '', source_table_name)
 
                         # Tìm thông tin mapping cho bảng
-                        table_mapping = next((table for table in db_mapping["tables"] if table["source_table"] == source_table_name), None)
+                        table_mapping = next((table for table in db_mapping["tables"] if table["source_table"].replace("_repaired", "") == source_table_name), None)
                         if not table_mapping:
-                            print(f"Không tìm thấy thông tin mapping cho bảng: {source_table_name}. Bỏ qua file {file}.")
+                            # print(f"Không tìm thấy thông tin mapping cho bảng: {source_table_name}. Bỏ qua file {file}.")
+                            # continue
+                            source_data = pd.read_csv(input_csv_path)
+                            relative_path = os.path.relpath(root, input_folder)
+                            output_folder = os.path.join("./standard", relative_path)
+                            os.makedirs(output_folder, exist_ok=True)
+
+                            # Tên file đích với thời gian hiện tại để phân biệt
+                            output_csv_name = f"{source_table_name}_standard_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
+                            output_csv_path = os.path.join(output_folder, output_csv_name)
+
+                            # Lưu dữ liệu đã chuẩn hóa vào file CSV đích
+                            source_data.to_csv(output_csv_path, index=False)
                             continue
 
                         # Lấy từ điển mapping
@@ -72,13 +83,13 @@ def map_all_tables_from_folder(input_folder, mapping_json):
                         actual_columns = standardized_data.columns
 
                         # Nếu số cột không đủ
-                        if len(actual_columns) != expected_columns:
-                            # Tìm các cột thiếu
-                            missing_columns = [col for col in mapping_dict.keys() if col not in actual_columns]
+                        # if len(actual_columns) != expected_columns:
+                        #     # Tìm các cột thiếu
+                        #     missing_columns = [col for col in mapping_dict.keys() if col not in actual_columns]
                             
-                            if missing_columns:
-                                print(f"File {file} không đủ cột sau khi mapping. Các cột thiếu: {', '.join(missing_columns)}. Bỏ qua file này.")
-                            continue
+                        #     if missing_columns:
+                        #         print(f"File {file} không đủ cột sau khi mapping. Các cột thiếu: {', '.join(missing_columns)}. Bỏ qua file này.")
+                        #     continue
 
                         # Tạo đường dẫn đích giữ nguyên cấu trúc thư mục con
                         relative_path = os.path.relpath(root, input_folder)

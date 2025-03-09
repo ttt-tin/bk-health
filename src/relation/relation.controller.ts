@@ -7,7 +7,7 @@ export class RelationshipController {
   constructor(private readonly relationshipService: RelationshipService) {}
 
   @Post()
-  create(@Body() dto: CreateRelationshipDto) {
+  create(@Body() dto: CreateRelationshipDto[]) {
     return this.relationshipService.create(dto);
   }
 

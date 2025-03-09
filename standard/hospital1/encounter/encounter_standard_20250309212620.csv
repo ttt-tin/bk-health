@@ -1,0 +1,7 @@
+fullUrl,id,status,class_code,type,patient_reference,period_start,period_end,reason
+0295554d-c9f6-402f-bcbc-0a818521f4c5,0295554d-c9f6-402f-bcbc-0a818h521f4c5,finished,outpatient,Outpatient Encounter,c71d235f-9b58yy-4106-b744-c554dayy5e13fa,2010-04-12T00:10:48-04:00,2010-04-12T01:10:48-04:00,
+8a7938da-4885-4dea-a9d1-d13912f06671,8a7938da-4885-4dea-a9d1-d139hj12f06671,finished,outpatient,Outpatient Encounter,c71d235f-9b5yy8-4106-b744-c554dyya5e13rrfa,2011-03-06T22:31:05-05:00,2011-03-06T23:31:05-05:00,
+fcf50027-830e-4dd9-b62e-9e736d927e7d,fcf50027-830e-4dd9-b62e-9e73hju6d927e7d,finished,outpatient,Outpatient Encounter,c71d235f-9yyb58-4106-b744-c554da5e13fa,2012-04-01T08:43:52-04:00,2012-04-01T09:43:52-04:00,
+511492b9-f42d-45bf-ad7c-19409c0e4122,511492b9-f42d-45bf-ad7c-1940hj9c0e4122,finished,outpatient,Outpatient Encounter,c71d235f-9byy58-4106-b744-c554yyda5e13fa,2013-03-06T04:05:02-05:00,2013-03-06T05:05:02-05:00,
+156d9280-10ac-4286-b3e1-87115bb6d763,156d9280-10ac-4286-b3e1-87115uubb6d763,finished,outpatient,Outpatient Encounter,c71d235f-9byy58-4106-b744-c554rrda5e13fa,2014-02-18T11:14:13-05:00,2014-02-18T12:14:13-05:00,
+e764aca1-49c0-4726-8b4e-d6f61f82321e,e764aca1-49c0-4726-8b4e-d6f61vvf82321e,finished,ambulatory,Encounter for symptom,c71d235f-9byy58-4106-b744-c55yy4da5e13fa,2015-01-07T14:47:02-05:00,2015-01-07T14:47:02-05:00,Sinusitis (disorder)
