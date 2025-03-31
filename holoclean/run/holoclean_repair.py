@@ -366,28 +366,28 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                             s3_client.put_object(Bucket=bucket_name, Key=s3_path, Body=error_data_json)
                             return False
                     except Exception as e:
-                        print('Error', e)
-                        current_date = datetime.now().strftime('%Y/%m/%d')
-                        s3_client = boto3.client(
-                            's3',
-                            aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-                            aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
-                            region_name=os.getenv('AWS_REGION')
-                        )
-                        bucket_name = 'bk-health-bucket-landing'
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                        s3_path = f"error_data/{database_name}/{table_name}/{current_date}/error_log_{timestamp}.json"
+                        # print('Error', e)
+                        # current_date = datetime.now().strftime('%Y/%m/%d')
+                        # s3_client = boto3.client(
+                        #     's3',
+                        #     aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+                        #     aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+                        #     region_name=os.getenv('AWS_REGION')
+                        # )
+                        # bucket_name = 'bk-health-bucket-landing'
+                        # timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                        # s3_path = f"error_data/{database_name}/{table_name}/{current_date}/error_log_{timestamp}.json"
 
-                        print("AWS_ACCESS_KEY:", os.getenv('AWS_ACCESS_KEY'))
-                        print("AWS_SECRET_KEY:", os.getenv('AWS_SECRET_KEY'))
-                        print("AWS_REGION:", os.getenv('AWS_REGION'))
+                        # print("AWS_ACCESS_KEY:", os.getenv('AWS_ACCESS_KEY'))
+                        # print("AWS_SECRET_KEY:", os.getenv('AWS_SECRET_KEY'))
+                        # print("AWS_REGION:", os.getenv('AWS_REGION'))
 
 
-                        # Convert data thành JSON
-                        error_data_json = json.dumps(records_dict, indent=4)
+                        # # Convert data thành JSON
+                        # error_data_json = json.dumps(records_dict, indent=4)
 
-                        # Upload file lên S3
-                        s3_client.put_object(Bucket=bucket_name, Key=s3_path, Body=error_data_json)
+                        # # Upload file lên S3
+                        # s3_client.put_object(Bucket=bucket_name, Key=s3_path, Body=error_data_json)
                         return False
                 #########################################
                 # Implement logic to check exist record #
