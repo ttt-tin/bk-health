@@ -14,6 +14,7 @@ import { ExternalVolumeModule } from "./external-volume/external-volume.module";
 import { S3Module } from "./s3/s3.module";
 import { RelationshipModule } from "./relation/relation.module";
 import { ExplorerModule } from "./explorer/explorer.module";
+import { MulterModule } from "@nestjs/platform-express";
 dotenv.config();
 
 @Module({
@@ -40,6 +41,9 @@ dotenv.config();
     S3Module,
     RelationshipModule,
     ExplorerModule,
+    MulterModule.register({
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
   ],
   controllers: [AppController],
   providers: [AppService],

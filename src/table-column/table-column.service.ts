@@ -42,4 +42,41 @@ export class TableColumnService {
 
     return this.columnRepo.save(columnsToSave);
   }
+
+  async parseAndSaveFromFile(
+    file: Express.Multer.File,
+    dbName: string,
+  ): Promise<TableColumnEntity[]> {
+    const text = file.buffer.toString("utf8");
+    const lines = text.split(/\r?\n/).filter(Boolean);
+
+    const columns: TableColumnEntity[] = [];
+
+    for (const line of lines) {
+      const [table_name, column_name] = line.split(",").map((s) => s.trim());
+      if (!table_name || !column_name) continue;
+
+      const entity = this.columnRepo.create({
+        schema_name: dbName,
+        table_name,
+        column_name,
+      });
+
+      columns.push(entity);
+    }
+
+    return this.columnRepo.save(columns);
+  }
+
+  async findByDatabaseAndTable(
+    db: string,
+    table: string,
+  ): Promise<TableColumnEntity[]> {
+    return this.columnRepo.find({
+      where: {
+        schema_name: db,
+        table_name: table,
+      },
+    });
+  }
 }

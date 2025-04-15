@@ -1,8 +1,9 @@
 // table-column.controller.ts
-import { Body, Controller, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, UploadedFile, UseInterceptors } from "@nestjs/common";
 import { TableColumnService } from "./table-column.service";
 import { DefineTableDto } from "./dto/define-table.dto";
 import { TableColumnEntity } from "./entities/table-column.entity";
+import { FileInterceptor } from "@nestjs/platform-express";
 
 @Controller("columns")
 export class TableColumnController {
@@ -13,5 +14,23 @@ export class TableColumnController {
     @Body() body: DefineTableDto[],
   ): Promise<TableColumnEntity[]> {
     return this.columnService.saveDefinedTables(body);
+  }
+
+  @Post("upload")
+  @UseInterceptors(FileInterceptor("file"))
+  async uploadDefineFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Query("databaseName") databaseName: string,
+  ): Promise<TableColumnEntity[]> {
+    return this.columnService.parseAndSaveFromFile(file, databaseName);
+  }
+
+  // GET theo database và table
+  @Get()
+  async getByDatabaseAndTable(
+    @Query("databaseName") dbName: string,
+    @Query("tableName") tableName: string,
+  ): Promise<TableColumnEntity[]> {
+    return this.columnService.findByDatabaseAndTable(dbName, tableName);
   }
 }
