@@ -56,6 +56,16 @@ export class TableColumnService {
       const [table_name, column_name] = line.split(",").map((s) => s.trim());
       if (!table_name || !column_name) continue;
 
+      const exists = await this.columnRepo.findOne({
+        where: {
+          schema_name: dbName,
+          table_name,
+          column_name,
+        },
+      });
+
+      if (exists) continue;
+
       const entity = this.columnRepo.create({
         schema_name: dbName,
         table_name,
@@ -78,5 +88,14 @@ export class TableColumnService {
         table_name: table,
       },
     });
+  }
+
+  async getAllSchemaNames(): Promise<string[]> {
+    const schemas = await this.columnRepo
+      .createQueryBuilder("column")
+      .select("DISTINCT column.schema_name", "schema_name")
+      .getRawMany();
+
+    return schemas.map((s) => s.schema_name);
   }
 }

@@ -15,6 +15,7 @@ import { S3Module } from "./s3/s3.module";
 import { RelationshipModule } from "./relation/relation.module";
 import { ExplorerModule } from "./explorer/explorer.module";
 import { MulterModule } from "@nestjs/platform-express";
+import { TableColumnModule } from "./table-column/table-column.module";
 dotenv.config();
 
 @Module({
@@ -44,6 +45,7 @@ dotenv.config();
     MulterModule.register({
       limits: { fileSize: 5 * 1024 * 1024 },
     }),
+    TableColumnModule,
   ],
   controllers: [AppController],
   providers: [AppService],

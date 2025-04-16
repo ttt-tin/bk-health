@@ -1,5 +1,13 @@
 // table-column.controller.ts
-import { Body, Controller, Get, Post, Query, UploadedFile, UseInterceptors } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
 import { TableColumnService } from "./table-column.service";
 import { DefineTableDto } from "./dto/define-table.dto";
 import { TableColumnEntity } from "./entities/table-column.entity";
@@ -32,5 +40,10 @@ export class TableColumnController {
     @Query("tableName") tableName: string,
   ): Promise<TableColumnEntity[]> {
     return this.columnService.findByDatabaseAndTable(dbName, tableName);
+  }
+
+  @Get("schemas")
+  async getAllSchemaNames(): Promise<string[]> {
+    return this.columnService.getAllSchemaNames();
   }
 }
