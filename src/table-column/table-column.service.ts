@@ -98,4 +98,15 @@ export class TableColumnService {
 
     return schemas.map((s) => s.schema_name);
   }
+
+  async getAllColumnNames(schemaName: string): Promise<string[]> {
+    const schemas = await this.columnRepo
+      .createQueryBuilder("column")
+      .select("DISTINCT column.table_name", "table_name")
+      .andWhere("column.schema_name = :schemaName", { schemaName })
+      .andWhere("column.table_name IS NOT NULL")
+      .getRawMany();
+
+    return schemas.map((s) => s.table_name);
+  }
 }

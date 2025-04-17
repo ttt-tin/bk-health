@@ -16,4 +16,8 @@ export class CreateMappingDto {
   @IsString()
   @IsOptional()
   standardColumn?: string;
+
+  @IsString()
+  @IsOptional()
+  standardTable?: string;
 }

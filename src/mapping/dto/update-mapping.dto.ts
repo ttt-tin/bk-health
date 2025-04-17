@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional } from "class-validator";
 
 export class UpdateMappingDto {
   @IsString()
@@ -16,4 +16,8 @@ export class UpdateMappingDto {
   @IsString()
   @IsOptional()
   standardColumn?: string;
+
+  @IsString()
+  @IsOptional()
+  standardTable?: string;
 }

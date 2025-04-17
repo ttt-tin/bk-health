@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Query,
   UploadedFile,
@@ -45,5 +46,10 @@ export class TableColumnController {
   @Get("schemas")
   async getAllSchemaNames(): Promise<string[]> {
     return this.columnService.getAllSchemaNames();
+  }
+
+  @Get("columns/:schemaName")
+  async getAllColumnNames(@Param('schemaName') schemaName: string): Promise<string[]> {
+    return this.columnService.getAllColumnNames(schemaName);
   }
 }

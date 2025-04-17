@@ -35,6 +35,11 @@ export class MappingController {
     return this.mappingService.findByDBName(dbName);
   }
 
+  @Get(':dbName/:dbTableName/:standardTabeName')
+  findMapping(@Param('dbName') dbName: string, @Param('dbTableName') dbTableName: string, @Param('standardTabeName') standardTabeName: string) {
+    return this.mappingService.findMapping(dbName, dbTableName, standardTabeName);
+  }
+
   @Put(':id')
   update(@Param('id') id: number, @Body() updateMappingDto: UpdateMappingDto) {
     return this.mappingService.update(id, updateMappingDto);
