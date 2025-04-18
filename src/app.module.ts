@@ -14,17 +14,18 @@ import { ExternalVolumeModule } from "./external-volume/external-volume.module";
 import { S3Module } from "./s3/s3.module";
 import { RelationshipModule } from "./relation/relation.module";
 import { ExplorerModule } from "./explorer/explorer.module";
+import { DataSourcesModule } from "./data-source/data-sources.module";
 dotenv.config();
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: "postgres",
-      host: process.env.HOLO_DB_HOST,
+      host: process.env.DB_HOST,
       port: 5432,
-      username: "holocleanuser",
-      password: "abcd1234",
-      database: "holo",
+      username: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
       entities: ["dist/**/**/*.entity.js"],
       synchronize: true,
       ssl: { rejectUnauthorized: false },
@@ -40,6 +41,7 @@ dotenv.config();
     S3Module,
     RelationshipModule,
     ExplorerModule,
+    DataSourcesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
