@@ -35,6 +35,15 @@ export class MappingEntity {
 
   @IsString()
   @Column({
+    name: "standard_db",
+    type: "varchar",
+    length: 255,
+    nullable: true,
+  })
+  standardDb: string;
+
+  @IsString()
+  @Column({
     name: "standard_table",
     type: "varchar",
     length: 255,
