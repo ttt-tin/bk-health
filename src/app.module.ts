@@ -30,7 +30,6 @@ dotenv.config();
       database: process.env.DB_NAME,
       entities: ["dist/**/**/*.entity.js"],
       synchronize: true,
-      ssl: { rejectUnauthorized: false },
     }),
     ConstraintModule,
     PythonModule,

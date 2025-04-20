@@ -1,17 +1,29 @@
 // table-column.service.ts
-import { Injectable } from "@nestjs/common";
+import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { TableColumnEntity } from "./entities/table-column.entity";
 import { DefineTableDto } from "./dto/define-table.dto";
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { Readable, Transform } from "stream";
+import { parse } from "csv-parse";
 
+interface SchemaField {
+  name: string;
+  type: string;
+}
 @Injectable()
 export class TableColumnService {
+  private readonly logger = new Logger(TableColumnService.name);
   constructor(
     private dataSource: DataSource,
-
     @InjectRepository(TableColumnEntity)
     private readonly columnRepo: Repository<TableColumnEntity>,
+    private readonly s3Client: S3Client,
   ) {}
 
   async saveDefinedTables(
@@ -108,5 +120,170 @@ export class TableColumnService {
       .getRawMany();
 
     return schemas.map((s) => s.table_name);
+  }
+
+  async detectSchemas(
+    bucket: string,
+    prefix?: string,
+    sampleLines = 10,
+  ): Promise<string> {
+    try {
+      const listObjectsCommand = new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+      });
+
+      const { Contents } = await this.s3Client.send(listObjectsCommand);
+      if (!Contents || Contents.length === 0) {
+        this.logger.log(
+          `No objects found in bucket "${bucket}" with prefix "${prefix}".`,
+        );
+        return "No objects found.";
+      }
+
+      const csvFiles = Contents.filter((obj) => obj.Key?.endsWith(".csv"));
+      this.logger.log(`Found ${csvFiles.length} CSV files. Processing...`);
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const obj of csvFiles) {
+        const key = obj.Key!;
+        const fileName = key.split("/").pop() ?? key;
+        const tableName = fileName.split("_")[0];
+        const schemaName = key.split("/")[0]; // Extract from path
+
+        const schemaExists = await this.columnRepo.findOne({
+          where: { table_name: tableName, schema_name: schemaName },
+        });
+
+        if (schemaExists) {
+          this.logger.log(
+            `Schema already exists for table "${tableName}" in schema "${schemaName}". Skipping ${key}`,
+          );
+          continue;
+        }
+
+        try {
+          const schema = await this.detectCsvSchema(bucket, key, sampleLines);
+          await this.insertSchemaIntoDatabaseBulk(
+            tableName,
+            schemaName,
+            schema,
+          );
+          this.logger.log(
+            `Successfully inserted schema for: ${tableName} (schema: ${schemaName})`,
+          );
+          successCount++;
+        } catch (error) {
+          this.logger.error(`Failed to process ${key}: ${error.message}`);
+          failCount++;
+        }
+      }
+
+      return `Schema detection complete. Success: ${successCount}, Failed: ${failCount}`;
+    } catch (error) {
+      this.logger.error(`Unexpected error: ${error.message}`);
+      throw new HttpException(
+        `Schema detection failed: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  private async detectCsvSchema(
+    bucket: string,
+    key: string,
+    sampleLines: number,
+  ): Promise<SchemaField[]> {
+    const getObjectCommand = new GetObjectCommand({ Bucket: bucket, Key: key });
+    const response = await this.s3Client.send(getObjectCommand);
+    const stream = response.Body as Readable;
+    if (!stream) throw new Error(`Empty stream for file: ${key}`);
+
+    let header: string[] = [];
+    const dataTypes: string[] = [];
+    let linesParsed = 0;
+    let stopStream = false;
+
+    const parser = stream.pipe(
+      parse({
+        delimiter: ",",
+        quote: '"',
+        escape: "\\",
+        columns: false,
+        trim: true,
+      }),
+    );
+
+    const transform = new Transform({
+      objectMode: true,
+      transform: (row: string[], _, callback) => {
+        if (stopStream) return callback(); // skip after enough lines
+
+        if (linesParsed === 0) {
+          header = row;
+          dataTypes.length = header.length;
+          dataTypes.fill("string");
+        } else if (linesParsed <= sampleLines) {
+          for (let i = 0; i < Math.min(row.length, header.length); i++) {
+            const val = row[i];
+            if (val === "") continue;
+            if (/^(\d+|\d*\.\d+)$/.test(val)) dataTypes[i] = "number";
+          }
+        }
+
+        linesParsed++;
+        if (linesParsed > sampleLines) {
+          stopStream = true; // stop parsing new rows
+        }
+
+        callback(null, row);
+      },
+    });
+
+    parser.pipe(transform);
+
+    await new Promise<void>((resolve, reject) => {
+      transform.on("finish", resolve);
+      transform.on("error", reject);
+      parser.on("error", reject);
+      stream.on("error", reject);
+    });
+
+    return header.map((name, i) => ({
+      name,
+      type: dataTypes[i] || "string",
+    }));
+  }
+
+  // New optimized bulk insert
+  private async insertSchemaIntoDatabaseBulk(
+    tableName: string,
+    schemaName: string,
+    schema: SchemaField[],
+  ): Promise<void> {
+    const records = schema.map((field) =>
+      this.columnRepo.create({
+        table_name: tableName,
+        schema_name: schemaName,
+        column_name: field.name,
+      }),
+    );
+
+    try {
+      await this.columnRepo.save(records);
+      this.logger.log(
+        `Inserted ${records.length} columns for ${tableName} in schema ${schemaName}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error inserting schema for ${tableName} in schema ${schemaName}: ${error.message}`,
+      );
+      throw new HttpException(
+        `DB insert failed for ${tableName} in schema ${schemaName}: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

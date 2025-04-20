@@ -3,6 +3,9 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
+  HttpStatus,
+  Logger,
   Param,
   Post,
   Query,
@@ -16,6 +19,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 
 @Controller("columns")
 export class TableColumnController {
+  private readonly logger = new Logger(TableColumnController.name);
   constructor(private readonly columnService: TableColumnService) {}
 
   @Post("define")
@@ -49,7 +53,27 @@ export class TableColumnController {
   }
 
   @Get("columns/:schemaName")
-  async getAllColumnNames(@Param('schemaName') schemaName: string): Promise<string[]> {
+  async getAllColumnNames(
+    @Param("schemaName") schemaName: string,
+  ): Promise<string[]> {
     return this.columnService.getAllColumnNames(schemaName);
+  }
+
+  @Get("detect")
+  async detectSchemas(
+    @Query("bucket") bucket: string,
+    @Query("prefix") prefix?: string,
+    @Query("sampleLines") sampleLines: number = 10,
+  ): Promise<string> {
+    if (!bucket) {
+      throw new HttpException(
+        "Bucket name is required",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    this.logger.log(
+      `Detecting schemas for bucket: ${bucket}, prefix: ${prefix}, sampleLines: ${sampleLines}`,
+    );
+    return this.columnService.detectSchemas(bucket, prefix, sampleLines);
   }
 }
