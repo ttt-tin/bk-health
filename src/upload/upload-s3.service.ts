@@ -136,7 +136,7 @@ export class UploadS3Service {
         // Construct S3 key using partitioned structure
         const s3Key = path.join(partitionFolder, filename); // Chỉ sử dụng partitionFolder cho S3 key
 
-        // await this.uploadFile(filePath, s3Key, bucket);
+        await this.uploadFile(filePath, s3Key, bucket);
       }
     }
   }
