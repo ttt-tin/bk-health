@@ -99,7 +99,6 @@ export class UploadS3Service {
   ): Promise<void> {
     const files = fs.readdirSync(sourceFolder);
 
-    console.log(`Files: ${files}`);
     // Get the current date and time for partitioning
     const currentDate = new Date();
     const yyyy = currentDate.getFullYear();
@@ -115,14 +114,9 @@ export class UploadS3Service {
       const filePath = path.join(sourceFolder, filename);
       const stat = fs.statSync(filePath);
       const relativePath = path.relative(sourceFolder, filePath);
-      const fullDestFolder = path.join(
-        destFolder,
-        relativePath,
-        partitionFolder,
-      ); // Sử dụng fullDestFolder cho cấu trúc phân cấp
-
+      
       if (stat.isDirectory()) {
-        console.log("111111111");
+        const fullDestFolder = path.join(destFolder, relativePath); // Sử dụng fullDestFolder cho cấu trúc phân cấp
         // Recursively upload files in subdirectories
         await this.uploadAllFilesCSVInFolder(filePath, fullDestFolder, bucket);
       } else if (
@@ -131,11 +125,8 @@ export class UploadS3Service {
         !filename.endsWith("_merged.csv")
       ) {
         // Only upload CSV files
-        console.log(`Uploading testttt: ${partitionFolder}, ${filePath}`);
-
         // Construct S3 key using partitioned structure
-        const s3Key = path.join(partitionFolder, filename); // Chỉ sử dụng partitionFolder cho S3 key
-
+        const s3Key = path.join(`standard/${destFolder}/${partitionFolder}`, filename); // Chỉ sử dụng partitionFolder cho S3 key
         await this.uploadFile(filePath, s3Key, bucket);
       }
     }
