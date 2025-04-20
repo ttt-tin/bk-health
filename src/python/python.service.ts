@@ -40,6 +40,34 @@ export class PythonService {
   }
 
   async runShellScript(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const scriptPath = './holoclean/run/script.sh';
+      const process = spawn('bash', [scriptPath]);
+
+      let output = '';
+      let error = '';
+
+      process.stdout.on('data', (data) => {
+        output += data.toString();
+        console.log(data.toString());
+      });
+
+      process.stderr.on('data', (data) => {
+        error += data.toString();
+        console.log(data.toString());
+      });
+
+      process.on('close', async (code) => {
+        if (code === 0) {
+          resolve(output.trim());
+        } else {
+          reject(new Error(`Shell script exited with code ${code}: ${error}`));
+        }
+      });
+    });
+  }
+
+  async runShellCleaningScript(): Promise<string> {
     const startTime = new Date();
     let status = 'Running';
     let duration: number;
@@ -53,7 +81,7 @@ export class PythonService {
     const savedHistoryEntry = await this.historyRepository.save(historyEntry);
 
     return new Promise((resolve, reject) => {
-      const scriptPath = './holoclean/run/script.sh';
+      const scriptPath = './holoclean/run/script_cleaning.sh';
       const process = spawn('bash', [scriptPath]);
 
       let output = '';

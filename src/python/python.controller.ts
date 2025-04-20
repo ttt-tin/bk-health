@@ -13,4 +13,13 @@ export class PythonController {
     console.log('Cleaning completed.')
     return result;
   }
+
+  @Get('run/cleaning')
+  async runCleaningPython(
+  ): Promise<string> {
+    const result = await this.pythonService.runShellCleaningScript();
+
+    console.log('Cleaning completed.')
+    return result;
+  }
 }
