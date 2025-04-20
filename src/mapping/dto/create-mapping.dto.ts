@@ -20,4 +20,8 @@ export class CreateMappingDto {
   @IsString()
   @IsOptional()
   standardTable?: string;
+
+  @IsString()
+  @IsOptional()
+  standardDb?: string;
 }
