@@ -17,7 +17,7 @@ s3_client = boto3.client(
     aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
     region_name=os.getenv('AWS_REGION')
 )
-BUCKET_NAME = 'bk-health-bucket-landing'
+BUCKET_NAME = 'bk-health-bucket-raw'
 POLLING_INTERVAL = 30
 BATCH_SIZE = 10
 EXTRACTION_SCRIPT = "holoclean/extension/ehr_extract.py"
@@ -43,7 +43,7 @@ def init_db():
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS processed_files (
+        CREATE TABLE IF NOT EXISTS processed_files_mapping (
             id SERIAL PRIMARY KEY,
             file_key TEXT UNIQUE NOT NULL,
             processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -64,7 +64,7 @@ def list_unprocessed_files():
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
         for file_key in all_files:
-            cursor.execute('SELECT file_key FROM processed_files WHERE file_key = %s', (file_key,))
+            cursor.execute('SELECT file_key FROM processed_files_mapping WHERE file_key = %s', (file_key,))
             if cursor.fetchone() is None:
                 unprocessed_files.append(file_key)
         cursor.close()
@@ -79,7 +79,7 @@ def mark_file_as_processed(file_key):
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
     try:
-        cursor.execute('INSERT INTO processed_files (file_key) VALUES (%s)', (file_key,))
+        cursor.execute('INSERT INTO processed_files_mapping (file_key) VALUES (%s)', (file_key,))
         conn.commit()
     except Exception as e:
         print(f"Error marking file as processed: {e}")
@@ -90,7 +90,7 @@ def mark_file_as_processed(file_key):
 # Download files in batch
 def download_batch(files):
     # Thư mục lưu trữ tệp tải xuống
-    save_dir = os.path.join(os.getcwd(), 'data', 'structure')
+    save_dir = os.path.join(os.getcwd(), 'standard')
     
     # Tạo thư mục nếu chưa tồn tại
     os.makedirs(save_dir, exist_ok=True)
@@ -112,14 +112,45 @@ def download_batch(files):
             print(f"Error downloading {file_key}: {e}")
     return local_paths
 
-# Run extract.py
-def run_extraction():
+# Run Holoclean
+def run_holoclean():
     try:
-        print("Running extraction script...")
-        result = subprocess.run(['python', EXTRACTION_SCRIPT], check=True)
-        print("Extraction script completed.")
+        print("Running Holoclean script...")
+        # result = subprocess.run(['python', HOLOCLEAN_SCRIPT], check=True)
+        process = subprocess.Popen(
+            ['bash', HOLOCLEAN_SCRIPT],  # Lệnh bash và các tham số
+            stdout=subprocess.PIPE,          # Lấy output
+            stderr=subprocess.PIPE,          # Lấy error
+            text=True                         # Đảm bảo là string (không phải bytes)
+        )
+
+        # Đọc output và error (nếu có)
+        stdout, stderr = process.communicate()
+
+        # Kiểm tra exit code để xử lý kết quả
+        if process.returncode == 0:
+            print("Holoclean script executed successfully.")
+            print("Output:", stdout)
+        else:
+            print(f"Error running script. Exit code: {process.returncode}")
+            print("Error Output:", stderr)
+        print("Holoclean script completed.")
     except subprocess.CalledProcessError as e:
-        print(f"Error running extract.py: {e}")
+        print(f"Error running holoclean.py: {e}")
+
+
+
+# Upload processed data to S3
+def upload_processed_data():
+    for root, _, files in os.walk(UPLOAD_FOLDER):
+        for file_name in files:
+            local_path = os.path.join(root, file_name)
+            s3_key = os.path.relpath(local_path, UPLOAD_FOLDER)
+            try:
+                print(f"Uploading {file_name} to S3...")
+                s3_client.upload_file(local_path, BUCKET_NAME, f'processed/{s3_key}')
+            except Exception as e:
+                print(f"Error uploading {file_name}: {e}")
 
 # Main pipeline
 def pipeline():
@@ -141,8 +172,11 @@ def pipeline():
         for file_key in batch:
             mark_file_as_processed(file_key)
 
-        # Run extract.py
-        run_extraction()
+        # Run Holoclean
+        run_holoclean()
+
+        # Upload cleaned data
+        upload_processed_data()
 
         print(f"Batch completed. Waiting {POLLING_INTERVAL} seconds before next batch.")
         time.sleep(POLLING_INTERVAL)
