@@ -6,6 +6,11 @@ import { CreateRelationshipDto } from "./dto/relationship.dto";
 export class RelationshipController {
   constructor(private readonly relationshipService: RelationshipService) {}
 
+  @Get("auto-detect")
+  async autoDetectReferences() {
+    return this.relationshipService.autoDetectReferences();
+  }
+
   @Post()
   create(@Body() dto: CreateRelationshipDto[]) {
     return this.relationshipService.create(dto);
