@@ -28,7 +28,7 @@ def processOneFile(sample_df,
     for index, row in sample_df.iterrows():
         try:
             tempdf=pd.json_normalize(row.entry)
-            tempdf.columns = tempdf.columns.str.replace("resource.", "", regex=False)
+            tempdf.columns = tempdf.columns.map(str).str.replace("resource.", "", regex=False)
 
             if str(tempdf['resourceType'][0])=="Patient":
                 tempdf = processPatient(tempdf)
@@ -93,24 +93,24 @@ def cleanAndRename(patient_df,
     try:
         for df in [patient_df, careplan_df, condition_df, diagnostic_report_df,
                     encounter_df, immunization_df, observation_df, procedure_df]:
-            df.columns = df.columns.str.replace("resource.", "", regex=False)
-            df.columns = df.columns.str.replace(".", "_", regex=False)
+            df.columns = df.columns.map(str).str.replace("resource.", "", regex=False)
+            df.columns = df.columns.map(str).str.replace(".", "_", regex=False)
             df.drop(columns=['resourceType'], inplace=True)
         
         for df in [patient_df, condition_df, diagnostic_report_df, observation_df, encounter_df]:
             df['fullUrl']= df['fullUrl'].str.replace('urn:uuid:', '')
             
         for df in [encounter_df, immunization_df]:
-            df['patient_reference'] = df['patient_reference'].str.replace('urn:uuid:', '')
+            df['patient_reference'] = df['patient_reference'].map(str).str.replace('urn:uuid:', '')
             
         for df in [immunization_df, diagnostic_report_df, observation_df, procedure_df]:
-            df['encounter_reference'] = df['encounter_reference'].str.replace('urn:uuid:', '')
+            df['encounter_reference'] = df['encounter_reference'].map(str).str.replace('urn:uuid:', '')
             
         for df in [observation_df, procedure_df, careplan_df, condition_df, diagnostic_report_df]:
-            df['subject_reference'] = df['subject_reference'].str.replace('urn:uuid:', '')
+            df['subject_reference'] = df['subject_reference'].map(str).str.replace('urn:uuid:', '')
 
         for df in [careplan_df, condition_df]:
-            df['context_reference'] = df['context_reference'].str.replace('urn:uuid:', '')
+            df['context_reference'] = df['context_reference'].map(str).str.replace('urn:uuid:', '')
     except Exception as e:
         print(f"Error processing: {e}")
         
@@ -209,7 +209,7 @@ def processProcedure(procedure_df):
     try:
         procedure_df = procedure_df.rename(columns={'code.text': 'code'})
         procedure_df.drop(columns=['code.coding'], inplace=True)
-        procedure_df['reasonReference_reference'] = procedure_df['reasonReference_reference'].str.replace('urn:uuid:', '') if 'reasonReference_reference' in procedure_df.columns.tolist() else pd.NA
+        procedure_df['reasonReference_reference'] = procedure_df['reasonReference_reference'].map(str).str.replace('urn:uuid:', '') if 'reasonReference_reference' in procedure_df.columns.tolist() else pd.NA
     except Exception as e:
         print(f"Error processing: {e}")
     return procedure_df

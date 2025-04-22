@@ -157,20 +157,20 @@ def pipeline():
     while True:
         clear_output_folder('output')
         print("Fetching unprocessed files...")
-        unprocessed_files = list_unprocessed_files()
-        if not unprocessed_files:
-            print("No new files to process. Waiting...")
-            time.sleep(POLLING_INTERVAL)
-            return
+        # unprocessed_files = list_unprocessed_files()
+        # if not unprocessed_files:
+        #     print("No new files to process. Waiting...")
+        #     time.sleep(POLLING_INTERVAL)
+        #     return
         
-        # Process files in batches
-        batch = unprocessed_files[:BATCH_SIZE]
-        print(f"Processing batch: {batch}")
-        local_files = download_batch(batch)
+        # # Process files in batches
+        # batch = unprocessed_files[:BATCH_SIZE]
+        # print(f"Processing batch: {batch}")
+        # local_files = download_batch(batch)
 
-        # Mark files as processed (before running extract to avoid duplication)
-        for file_key in batch:
-            mark_file_as_processed(file_key)
+        # # Mark files as processed (before running extract to avoid duplication)
+        # for file_key in batch:
+        #     mark_file_as_processed(file_key)
 
         # Run Holoclean
         run_holoclean()
