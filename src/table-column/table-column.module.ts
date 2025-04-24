@@ -11,6 +11,7 @@ import { S3Module } from "src/s3/s3.module";
     TypeOrmModule.forFeature([TableColumnEntity]),
     AthenaModule,
     S3Module,
+    AthenaModule,
   ],
   controllers: [TableColumnController],
   providers: [TableColumnService],

@@ -11,6 +11,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { Readable, Transform } from "stream";
 import { parse } from "csv-parse";
+import { StartQueryExecutionCommand } from "@aws-sdk/client-athena";
+import { AthenaService } from "src/athena/athena.service";
 
 interface SchemaField {
   name: string;
@@ -24,6 +26,7 @@ export class TableColumnService {
     @InjectRepository(TableColumnEntity)
     private readonly columnRepo: Repository<TableColumnEntity>,
     private readonly s3Client: S3Client,
+    private readonly athenaService: AthenaService,
   ) {}
 
   async saveDefinedTables(
@@ -120,6 +123,34 @@ export class TableColumnService {
       .getRawMany();
 
     return schemas.map((s) => s.table_name);
+  }
+
+  async getSchemaColumns(schemaName: string): Promise<
+    {
+      tableName: string;
+      columns: { name: string; type: string }[];
+    }[]
+  > {
+    const rows = await this.columnRepo.find({
+      where: { schema_name: schemaName },
+    });
+
+    const tablesMap = new Map<string, { name: string; type: string }[]>();
+
+    for (const row of rows) {
+      if (!tablesMap.has(row.table_name)) {
+        tablesMap.set(row.table_name, []);
+      }
+      tablesMap.get(row.table_name).push({
+        name: row.column_name,
+        type: row.type,
+      });
+    }
+
+    return Array.from(tablesMap.entries()).map(([tableName, columns]) => ({
+      tableName,
+      columns,
+    }));
   }
 
   async detectSchemas(
@@ -268,6 +299,7 @@ export class TableColumnService {
         table_name: tableName,
         schema_name: schemaName,
         column_name: field.name,
+        type: field.type, // ✅ Now saving the data type as well
       }),
     );
 
@@ -285,5 +317,55 @@ export class TableColumnService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  async createTablesInAthena(schemaName: string): Promise<any> {
+    const schemaTables = await this.getSchemaColumns(schemaName);
+    const results = [];
+
+    for (const table of schemaTables) {
+      const createQuery = this.buildCreateTableQuery(
+        schemaName,
+        table.tableName,
+        table.columns,
+      );
+
+      try {
+        await this.athenaService.executeQuery(createQuery, schemaName, true); // Use rawOutput = true for DDL
+        results.push({ table: table.tableName, status: "submitted" });
+      } catch (error) {
+        results.push({
+          table: table.tableName,
+          status: "failed",
+          error: error.message,
+        });
+      }
+    }
+
+    return {
+      message: "Tables creation queries submitted to Athena",
+      results,
+    };
+  }
+
+  private buildCreateTableQuery(
+    schema: string,
+    tableName: string,
+    columns: { name: string; type: string }[],
+  ): string {
+    const columnDefs = columns
+      .map((col) => `\`${col.name}\` ${col.type}`)
+      .join(",\n  ");
+    return `
+      CREATE TABLE IF NOT EXISTS \`${schema}\`.\`${tableName}\` (
+        ${columnDefs}
+      )
+      STORED AS PARQUET
+      LOCATION 's3://bk-health-bucket-trusted/'
+        TBLPROPERTIES (
+            'table_type'='ICEBERG',
+            'format'='parquet'
+        );
+    `.trim();
   }
 }

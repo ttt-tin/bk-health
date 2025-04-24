@@ -76,4 +76,9 @@ export class TableColumnController {
     );
     return this.columnService.detectSchemas(bucket, prefix, sampleLines);
   }
+
+  @Post("schemas/:schemaName/create-athena")
+  async createAthenaTablesFromSchema(@Param("schemaName") schemaName: string) {
+    return this.columnService.createTablesInAthena(schemaName);
+  }
 }

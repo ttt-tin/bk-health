@@ -14,4 +14,7 @@ export class TableColumnEntity {
 
   @Column()
   column_name: string;
+
+  @Column()
+  type: string;
 }
