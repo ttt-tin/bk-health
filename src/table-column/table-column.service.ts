@@ -155,7 +155,7 @@ export class TableColumnService {
 
   async detectSchemas(
     bucket: string,
-    prefix?: string,
+    prefix = "structure/",
     sampleLines = 10,
   ): Promise<string> {
     try {
@@ -173,42 +173,57 @@ export class TableColumnService {
       }
 
       const csvFiles = Contents.filter((obj) => obj.Key?.endsWith(".csv"));
-      this.logger.log(`Found ${csvFiles.length} CSV files. Processing...`);
+
+      // Group files by folder (schema name)
+      const filesBySchema: Record<string, string[]> = {};
+      for (const obj of csvFiles) {
+        const key = obj.Key!;
+        const parts = key.replace(prefix, "").split("/");
+
+        if (parts.length < 2) continue; // Ignore files not in a subfolder
+        const schemaName = parts[0];
+
+        if (!filesBySchema[schemaName]) {
+          filesBySchema[schemaName] = [];
+        }
+        filesBySchema[schemaName].push(key);
+      }
 
       let successCount = 0;
       let failCount = 0;
 
-      for (const obj of csvFiles) {
-        const key = obj.Key!;
-        const fileName = key.split("/").pop() ?? key;
-        const tableName = fileName.split("_")[0];
-        const schemaName = key.split("/")[0]; // Extract from path
+      // Loop over each folder (schema)
+      for (const [schemaName, keys] of Object.entries(filesBySchema)) {
+        for (const key of keys) {
+          const fileName = key.split("/").pop() ?? key;
+          const tableName = fileName.split("_")[0];
 
-        const schemaExists = await this.columnRepo.findOne({
-          where: { table_name: tableName, schema_name: schemaName },
-        });
+          const schemaExists = await this.columnRepo.findOne({
+            where: { table_name: tableName, schema_name: schemaName },
+          });
 
-        if (schemaExists) {
-          this.logger.log(
-            `Schema already exists for table "${tableName}" in schema "${schemaName}". Skipping ${key}`,
-          );
-          continue;
-        }
+          if (schemaExists) {
+            this.logger.log(
+              `Schema already exists for table "${tableName}" in schema "${schemaName}". Skipping ${key}`,
+            );
+            continue;
+          }
 
-        try {
-          const schema = await this.detectCsvSchema(bucket, key, sampleLines);
-          await this.insertSchemaIntoDatabaseBulk(
-            tableName,
-            schemaName,
-            schema,
-          );
-          this.logger.log(
-            `Successfully inserted schema for: ${tableName} (schema: ${schemaName})`,
-          );
-          successCount++;
-        } catch (error) {
-          this.logger.error(`Failed to process ${key}: ${error.message}`);
-          failCount++;
+          try {
+            const schema = await this.detectCsvSchema(bucket, key, sampleLines);
+            await this.insertSchemaIntoDatabaseBulk(
+              tableName,
+              schemaName,
+              schema,
+            );
+            this.logger.log(
+              `Successfully inserted schema for: ${tableName} (schema: ${schemaName})`,
+            );
+            successCount++;
+          } catch (error) {
+            this.logger.error(`Failed to process ${key}: ${error.message}`);
+            failCount++;
+          }
         }
       }
 
@@ -260,7 +275,11 @@ export class TableColumnService {
           for (let i = 0; i < Math.min(row.length, header.length); i++) {
             const val = row[i];
             if (val === "") continue;
-            if (/^(\d+|\d*\.\d+)$/.test(val)) dataTypes[i] = "number";
+            if (/^-?\d+$/.test(val)) {
+              dataTypes[i] = "int";
+            } else if (/^-?\d*\.\d+$/.test(val)) {
+              dataTypes[i] = "double";
+            }
           }
         }
 
@@ -294,19 +313,37 @@ export class TableColumnService {
     schemaName: string,
     schema: SchemaField[],
   ): Promise<void> {
-    const records = schema.map((field) =>
+    const uniqueColumns = new Map<string, SchemaField>();
+
+    for (const field of schema) {
+      const columnName = field.name?.trim();
+      if (!columnName) continue; // Skip empty names
+
+      if (!uniqueColumns.has(columnName)) {
+        uniqueColumns.set(columnName, { name: columnName, type: field.type });
+      }
+    }
+
+    if (uniqueColumns.size === 0) {
+      this.logger.warn(
+        `No valid or unique columns found for table "${tableName}" in schema "${schemaName}". Skipping insert.`,
+      );
+      return;
+    }
+
+    const records = Array.from(uniqueColumns.values()).map((field) =>
       this.columnRepo.create({
         table_name: tableName,
         schema_name: schemaName,
         column_name: field.name,
-        type: field.type, // ✅ Now saving the data type as well
+        type: field.type,
       }),
     );
 
     try {
       await this.columnRepo.save(records);
       this.logger.log(
-        `Inserted ${records.length} columns for ${tableName} in schema ${schemaName}`,
+        `Inserted ${records.length} unique columns for ${tableName} in schema ${schemaName}`,
       );
     } catch (error) {
       this.logger.error(
@@ -357,15 +394,14 @@ export class TableColumnService {
       .map((col) => `\`${col.name}\` ${col.type}`)
       .join(",\n  ");
     return `
-      CREATE TABLE IF NOT EXISTS \`${schema}\`.\`${tableName}\` (
+      CREATE TABLE IF NOT EXISTS hospital_data.${tableName} (
         ${columnDefs}
       )
-      STORED AS PARQUET
       LOCATION 's3://bk-health-bucket-trusted/'
-        TBLPROPERTIES (
-            'table_type'='ICEBERG',
-            'format'='parquet'
-        );
+      TBLPROPERTIES (
+          'table_type'='ICEBERG',
+          'format'='parquet'
+      );
     `.trim();
   }
 }
