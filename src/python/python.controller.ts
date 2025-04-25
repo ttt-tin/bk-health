@@ -1,25 +1,23 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { PythonService } from './python.service';
+import { Controller, Get, Query } from "@nestjs/common";
+import { PythonService } from "./python.service";
 
-@Controller('python')
+@Controller("python")
 export class PythonController {
   constructor(private readonly pythonService: PythonService) {}
 
-  @Get('run')
-  async runPython(
-  ): Promise<string> {
+  @Get("run")
+  async runPython(): Promise<string> {
     const result = await this.pythonService.runShellScript();
 
-    console.log('Cleaning completed.')
+    console.log("Cleaning completed.");
     return result;
   }
 
-  @Get('run/cleaning')
-  async runCleaningPython(
-  ): Promise<string> {
+  @Get("run/cleaning")
+  async runCleaningPython(): Promise<string> {
     const result = await this.pythonService.runShellCleaningScript();
 
-    console.log('Cleaning completed.')
+    console.log("Cleaning completed.");
     return result;
   }
 }

@@ -115,4 +115,13 @@ export class AthenaController {
       throw new HttpException(err.message, HttpStatus.BAD_REQUEST);
     }
   }
+
+  @Get("check-empty")
+  async isHospitalDataEmpty(): Promise<boolean> {
+    const tables = await this.athenaService.listTables(
+      "AwsDataCatalog",
+      "hospital_data",
+    );
+    return tables.length === 0;
+  }
 }
