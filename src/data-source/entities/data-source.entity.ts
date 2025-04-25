@@ -19,9 +19,9 @@ export class DataSource {
   @Column()
   name: string;
 
-  @Column({ type: "enum", enum: DataType })
+  @Column({ type: "enum", enum: DataType, nullable: true })
   dataType: DataType;
 
-  @Column({ type: "enum", enum: FileType })
+  @Column({ type: "enum", enum: FileType, nullable: true })
   fileType: FileType;
 }

@@ -23,11 +23,11 @@ dotenv.config();
   imports: [
     TypeOrmModule.forRoot({
       type: "postgres",
-      host: process.env.DB_HOST,
+      host: process.env.HOLO_DB_HOST,
       port: 5432,
-      username: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
+      username: process.env.HOLO_DB_USER,
+      password: process.env.HOLO_DB_PASSWORD,
+      database: process.env.HOLO_DB_NAME,
       entities: ["dist/**/**/*.entity.js"],
       synchronize: true,
     }),

@@ -1,110 +1,93 @@
 import pandas as pd
-import json
 import os
-from datetime import datetime
 import re
+import psycopg2
+from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv()
 
-def map_all_tables_from_folder(input_folder, mapping_json):
+# Cấu hình kết nối PostgreSQL
+DB_CONFIG = {
+    'dbname': os.getenv('HOLO_DB_NAME'),
+    'user': os.getenv('HOLO_DB_USER'),
+    'password': os.getenv('HOLO_DB_PASSWORD'),
+    'host': os.getenv('HOLO_DB_HOST'),
+    'port': os.getenv('HOLO_DB_PORT', 5432)
+}
+
+def load_mapping_from_postgres(db_name, table_name):
     """
-    Hàm thực hiện mapping cột giữa các bảng trong các database từ file JSON và giữ nguyên cấu trúc thư mục.
-
-    Args:
-        input_folder (str): Đường dẫn đến thư mục chứa các file CSV nguồn.
-        mapping_json (str): Đường dẫn đến file JSON chứa thông tin mapping.
-
-    Returns:
-        None
+    Tải thông tin mapping từ bảng mapping trong PostgreSQL
+    Trả về dict: {source_table_name: {standard_column: source_column}}
     """
+    conn = psycopg2.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+    cursor.execute("SELECT db_table, db_column, standard_table, standard_column FROM mapping WHERE db_name = %s AND db_table = %s", (db_name, table_name))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    print('rows', rows)
+
+    mapping_data = {}
+    for db_table, db_column, _, standard_column in rows:
+        db_table = db_table.replace("_repaired", "")
+        if db_table not in mapping_data:
+            mapping_data[db_table] = {}
+        mapping_data[db_table][standard_column] = db_column
+    return mapping_data
+
+def map_all_tables_from_folder(input_folder):
     try:
-        # Đọc thông tin mapping từ file JSON
-        with open(mapping_json, 'r') as f:
-            mapping_data = json.load(f)
-
-        # Lấy thông tin mapping của database duy nhất
-        db_mapping = mapping_data  # Giả sử chỉ có một database
-        print('db_mapping', db_mapping['database'])
-
-        if not db_mapping:
-            raise ValueError("Không tìm thấy thông tin mapping cho database.")
-
-        # Duyệt qua tất cả file trong thư mục (bao gồm cả thư mục con)
         for root, _, files in os.walk(input_folder):
             for file in files:
-                try: 
+                try:
                     if file.endswith('.csv'):
-                        # Đường dẫn đầy đủ của file CSV
                         input_csv_path = os.path.join(root, file)
 
-                        # Tên bảng nguồn lấy từ tên file CSV (bỏ phần mở rộng .csv)
                         source_table_name = os.path.splitext(file)[0]
                         source_table_name = re.sub(r'_data_\d{14}$', '', source_table_name)
 
-                        # Tìm thông tin mapping cho bảng
-                        table_mapping = next((table for table in db_mapping["tables"] if table["source_table"].replace("_repaired", "") == source_table_name), None)
+                        relative_path = os.path.relpath(root, input_folder) 
+                        parts = relative_path.split(os.sep)
+                        db_name = parts[0] if len(parts) > 0 else 'unknown'
+                        table_name = parts[1] if len(parts) > 1 else 'unknown'
+
+                        table_mapping = load_mapping_from_postgres(db_name, 'patient_repaired')
+                        print('table_mapping', table_mapping)
+
+                        source_data = pd.read_csv(input_csv_path)
+
                         if not table_mapping:
-                            # print(f"Không tìm thấy thông tin mapping cho bảng: {source_table_name}. Bỏ qua file {file}.")
-                            # continue
-                            source_data = pd.read_csv(input_csv_path)
                             relative_path = os.path.relpath(root, input_folder)
                             output_folder = os.path.join("./standard", relative_path)
                             os.makedirs(output_folder, exist_ok=True)
 
-                            # Tên file đích với thời gian hiện tại để phân biệt
                             output_csv_name = f"{source_table_name}_standard_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
                             output_csv_path = os.path.join(output_folder, output_csv_name)
-
-                            # Lưu dữ liệu đã chuẩn hóa vào file CSV đích
                             source_data.to_csv(output_csv_path, index=False)
                             continue
 
-                        # Lấy từ điển mapping
-                        mapping_dict = table_mapping["mapping"]
+                        # Mapping dữ liệu
+                        for standard_column, source_column in table_mapping.items():
+                            if source_column in source_data.columns:
+                                source_data[standard_column] = source_data[source_column]
 
-                        # Đọc dữ liệu từ file CSV
-                        source_data = pd.read_csv(input_csv_path)
-
-                        # Kiểm tra và thay đổi các cột theo ánh xạ
-                        for standard_column, values in mapping_dict.items():
-                            if isinstance(values, list):
-                                for check_column in values:
-                                    if check_column in source_data.columns:
-                                        source_data[standard_column] = source_data[check_column]
-                                        break
-                            else:
-                                if values in source_data.columns:
-                                    source_data[standard_column] = source_data[values]
-
-                        # Giữ lại các cột được mapping và áp dụng đổi tên cột
-                        columns_to_keep = [col for col in source_data.columns if col in mapping_dict]
+                        columns_to_keep = list(table_mapping.keys())
                         standardized_data = source_data[columns_to_keep]
 
-                        # Kiểm tra nếu số cột sau khi mapping không đủ như định nghĩa trong JSON thì bỏ qua file
-                        expected_columns = len(mapping_dict)
-                        actual_columns = standardized_data.columns
-
-                        # Nếu số cột không đủ
-                        # if len(actual_columns) != expected_columns:
-                        #     # Tìm các cột thiếu
-                        #     missing_columns = [col for col in mapping_dict.keys() if col not in actual_columns]
-                            
-                        #     if missing_columns:
-                        #         print(f"File {file} không đủ cột sau khi mapping. Các cột thiếu: {', '.join(missing_columns)}. Bỏ qua file này.")
-                        #     continue
-
-                        # Tạo đường dẫn đích giữ nguyên cấu trúc thư mục con
+                        # Lưu dữ liệu sau mapping
                         relative_path = os.path.relpath(root, input_folder)
                         output_folder = os.path.join("./standard", relative_path)
                         os.makedirs(output_folder, exist_ok=True)
 
-                        # Tên file đích với thời gian hiện tại để phân biệt
                         output_csv_name = f"{source_table_name}_standard_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"
                         output_csv_path = os.path.join(output_folder, output_csv_name)
-
-                        # Lưu dữ liệu đã chuẩn hóa vào file CSV đích
                         standardized_data.to_csv(output_csv_path, index=False)
 
-                        print(f"Mapping và chuẩn hóa dữ liệu thành công. File kết quả: {output_csv_path}")
+                        print(f"✅ Chuẩn hóa: {file} -> {output_csv_path}")
+
                 except Exception as e:
-                    print(e)
+                    print(f"-----")
     except Exception as e:
-        print(f"Đã xảy ra lỗi: {e}")
+        print(f"❌ Đã xảy ra lỗi chung: {e}")
