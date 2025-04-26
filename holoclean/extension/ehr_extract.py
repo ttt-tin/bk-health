@@ -359,7 +359,7 @@ def main():
                     aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
                     region_name=os.getenv('AWS_REGION')
 
-                    upload_file_to_nestjs_api('./output', 'bk-health-bucket-raw')
+                    # upload_file_to_nestjs_api('./output', 'bk-health-bucket-raw')
             except Exception as e:
                 print(f"Error processing: {e}")
 

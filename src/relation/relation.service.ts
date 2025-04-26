@@ -9,6 +9,8 @@ import { TableColumnEntity } from "src/table-column/entities/table-column.entity
 
 @Injectable()
 export class RelationshipService {
+  private BK_HEALTH_LAKEHOUSE_DB = 'bk_health_lakehouse_db'
+ 
   constructor(
     @InjectRepository(RelationshipEntity)
     private relationshipRepo: Repository<RelationshipEntity>,
@@ -22,7 +24,7 @@ export class RelationshipService {
   async create(dtos: CreateRelationshipDto[]) {
     for (const dto of dtos) {
       const id = uuidv4();
-      const query = `INSERT INTO bk_health_lakehouse_db.relationships (id, table_reference, table_was_reference, pri_key, fo_key)
+      const query = `INSERT INTO ${this.BK_HEALTH_LAKEHOUSE_DB}.relationships (id, table_reference, table_was_reference, pri_key, fo_key)
         VALUES ('${id}', '${dto.tableReference}', '${dto.tableWasReference}', '${dto.priKey}', '${dto.foKey}');`;
       await this.athenaService.executeQuery(query);
     }
