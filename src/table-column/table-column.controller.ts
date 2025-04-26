@@ -52,17 +52,9 @@ export class TableColumnController {
     return this.columnService.getAllSchemaNames();
   }
 
-  @Get("columns/:schemaName")
-  async getAllColumnNames(
-    @Param("schemaName") schemaName: string,
-  ): Promise<string[]> {
-    return this.columnService.getAllColumnNames(schemaName);
-  }
-
   @Get("detect")
   async detectSchemas(
     @Query("bucket") bucket: string,
-    @Query("prefix") prefix?: string,
     @Query("sampleLines") sampleLines: number = 10,
   ): Promise<string> {
     if (!bucket) {
@@ -72,13 +64,28 @@ export class TableColumnController {
       );
     }
     this.logger.log(
-      `Detecting schemas for bucket: ${bucket}, prefix: ${prefix}, sampleLines: ${sampleLines}`,
+      `Detecting schemas for bucket: ${bucket} sampleLines: ${sampleLines}`,
     );
-    return this.columnService.detectSchemas(bucket, prefix, sampleLines);
+    return this.columnService.detectSchemas(bucket, sampleLines);
   }
 
   @Post("schemas/:schemaName/create-athena")
   async createAthenaTablesFromSchema(@Param("schemaName") schemaName: string) {
     return this.columnService.createTablesInAthena(schemaName);
+  }
+
+  @Get(":schemaName/tables")
+  async getTablesInSchema(
+    @Param("schemaName") schemaName: string,
+  ): Promise<string[]> {
+    return this.columnService.getTablesInSchema(schemaName);
+  }
+
+  @Get(":schemaName/tables/:tableName/schema")
+  async getTableSchema(
+    @Param("schemaName") schemaName: string,
+    @Param("tableName") tableName: string,
+  ): Promise<{ columns: { name: string; type: string }[] }> {
+    return this.columnService.getTableSchema(schemaName, tableName);
   }
 }

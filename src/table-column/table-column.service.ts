@@ -1,4 +1,3 @@
-// table-column.service.ts
 import { HttpException, HttpStatus, Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
@@ -11,13 +10,13 @@ import {
 } from "@aws-sdk/client-s3";
 import { Readable, Transform } from "stream";
 import { parse } from "csv-parse";
-import { StartQueryExecutionCommand } from "@aws-sdk/client-athena";
 import { AthenaService } from "src/athena/athena.service";
 
 interface SchemaField {
   name: string;
   type: string;
 }
+
 @Injectable()
 export class TableColumnService {
   private readonly logger = new Logger(TableColumnService.name);
@@ -114,15 +113,67 @@ export class TableColumnService {
     return schemas.map((s) => s.schema_name);
   }
 
-  async getAllColumnNames(schemaName: string): Promise<string[]> {
-    const schemas = await this.columnRepo
-      .createQueryBuilder("column")
-      .select("DISTINCT column.table_name", "table_name")
-      .andWhere("column.schema_name = :schemaName", { schemaName })
-      .andWhere("column.table_name IS NOT NULL")
-      .getRawMany();
+  async getTablesInSchema(schemaName: string): Promise<string[]> {
+    try {
+      const tables = await this.columnRepo
+        .createQueryBuilder("column")
+        .select("DISTINCT column.table_name", "table_name")
+        .where("column.schema_name = :schemaName", { schemaName })
+        .andWhere("column.table_name IS NOT NULL")
+        .getRawMany();
 
-    return schemas.map((s) => s.table_name);
+
+      return tables.map((t) => t.table_name);
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch tables for schema ${schemaName}: ${error.message}`,
+      );
+      throw new HttpException(
+        `Failed to fetch tables for schema ${schemaName}: ${error.message}`,
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async getTableSchema(
+    schemaName: string,
+    tableName: string,
+  ): Promise<{ columns: { name: string; type: string }[] }> {
+    try {
+      const columns = await this.columnRepo.find({
+        where: {
+          schema_name: schemaName,
+          table_name: tableName,
+        },
+      });
+
+      if (!columns.length) {
+        this.logger.warn(
+          `No columns found for table ${schemaName}.${tableName}`,
+        );
+        throw new HttpException(
+          `No columns found for table ${schemaName}.${tableName}`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return {
+        columns: columns.map((col) => ({
+          name: col.column_name,
+          type: col.type || "string", // Fallback to "string" if type is null
+        })),
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch schema for table ${schemaName}.${tableName}: ${error.message}`,
+      );
+      throw error instanceof HttpException
+        ? error
+        : new HttpException(
+            `Failed to fetch schema for table ${schemaName}.${tableName}: ${error.message}`,
+            HttpStatus.INTERNAL_SERVER_ERROR,
+          );
+    }
   }
 
   async getSchemaColumns(schemaName: string): Promise<
@@ -153,63 +204,62 @@ export class TableColumnService {
     }));
   }
 
-  async detectSchemas(
-    bucket: string,
-    prefix = "structure/",
-    sampleLines = 10,
-  ): Promise<string> {
+  async detectSchemas(bucket: string, sampleLines = 10): Promise<string> {
     try {
       const listObjectsCommand = new ListObjectsV2Command({
         Bucket: bucket,
-        Prefix: prefix,
       });
 
       const { Contents } = await this.s3Client.send(listObjectsCommand);
       if (!Contents || Contents.length === 0) {
-        this.logger.log(
-          `No objects found in bucket "${bucket}" with prefix "${prefix}".`,
-        );
+        this.logger.log(`No objects found in bucket "${bucket}".`);
         return "No objects found.";
       }
 
       const csvFiles = Contents.filter((obj) => obj.Key?.endsWith(".csv"));
 
-      // Group files by folder (schema name)
-      const filesBySchema: Record<string, string[]> = {};
+      const schemaTableFiles: Record<string, Record<string, string>> = {};
+
       for (const obj of csvFiles) {
         const key = obj.Key!;
-        const parts = key.replace(prefix, "").split("/");
+        const parts = key.split("/");
 
-        if (parts.length < 2) continue; // Ignore files not in a subfolder
+        // Expecting: <schema>/<table>/<year>/<month>/<day>/<hour>/file.csv
+        if (parts.length < 3) continue;
+
         const schemaName = parts[0];
+        const tableName = parts[1];
 
-        if (!filesBySchema[schemaName]) {
-          filesBySchema[schemaName] = [];
+        if (!schemaName || !tableName) continue;
+
+        if (!schemaTableFiles[schemaName]) {
+          schemaTableFiles[schemaName] = {};
         }
-        filesBySchema[schemaName].push(key);
+
+        // Only store one file path per schema+table
+        if (!schemaTableFiles[schemaName][tableName]) {
+          schemaTableFiles[schemaName][tableName] = key;
+        }
       }
 
       let successCount = 0;
       let failCount = 0;
 
-      // Loop over each folder (schema)
-      for (const [schemaName, keys] of Object.entries(filesBySchema)) {
-        for (const key of keys) {
-          const fileName = key.split("/").pop() ?? key;
-          const tableName = fileName.split("_")[0];
-
+      for (const [schemaName, tables] of Object.entries(schemaTableFiles)) {
+        for (const [tableName, key] of Object.entries(tables)) {
           const schemaExists = await this.columnRepo.findOne({
             where: { table_name: tableName, schema_name: schemaName },
           });
 
           if (schemaExists) {
             this.logger.log(
-              `Schema already exists for table "${tableName}" in schema "${schemaName}". Skipping ${key}`,
+              `Schema already exists for table "${tableName}" in schema "${schemaName}". Skipping.`,
             );
             continue;
           }
 
           try {
+            this.logger.log(`Detecting schema from: ${key}`);
             const schema = await this.detectCsvSchema(bucket, key, sampleLines);
             await this.insertSchemaIntoDatabaseBulk(
               tableName,
@@ -217,11 +267,11 @@ export class TableColumnService {
               schema,
             );
             this.logger.log(
-              `Successfully inserted schema for: ${tableName} (schema: ${schemaName})`,
+              `✅ Inserted schema for: ${tableName} (schema: ${schemaName})`,
             );
             successCount++;
           } catch (error) {
-            this.logger.error(`Failed to process ${key}: ${error.message}`);
+            this.logger.error(`❌ Failed to process ${key}: ${error.message}`);
             failCount++;
           }
         }
@@ -248,7 +298,7 @@ export class TableColumnService {
     if (!stream) throw new Error(`Empty stream for file: ${key}`);
 
     let header: string[] = [];
-    const dataTypes: string[] = [];
+    let dataTypes: string[] = [];
     let linesParsed = 0;
     let stopStream = false;
 
@@ -265,15 +315,14 @@ export class TableColumnService {
     const transform = new Transform({
       objectMode: true,
       transform: (row: string[], _, callback) => {
-        if (stopStream) return callback(); // skip after enough lines
+        if (stopStream) return callback();
 
         if (linesParsed === 0) {
-          header = row;
-          dataTypes.length = header.length;
-          dataTypes.fill("string");
+          header = row.map((col) => col.trim());
+          dataTypes = Array(header.length).fill("string");
         } else if (linesParsed <= sampleLines) {
           for (let i = 0; i < Math.min(row.length, header.length); i++) {
-            const val = row[i];
+            const val = row[i]?.trim();
             if (val === "") continue;
             if (/^-?\d+$/.test(val)) {
               dataTypes[i] = "int";
@@ -285,7 +334,7 @@ export class TableColumnService {
 
         linesParsed++;
         if (linesParsed > sampleLines) {
-          stopStream = true; // stop parsing new rows
+          stopStream = true;
         }
 
         callback(null, row);
@@ -301,53 +350,67 @@ export class TableColumnService {
       stream.on("error", reject);
     });
 
-    return header.map((name, i) => ({
-      name,
-      type: dataTypes[i] || "string",
-    }));
+    // Final cleaning + return
+    return header
+      .map((name, i) => ({
+        name: name?.trim(),
+        type: dataTypes[i] || "string",
+      }))
+      .filter((f) => f.name); // Ensure no empty/null column names
   }
 
-  // New optimized bulk insert
   private async insertSchemaIntoDatabaseBulk(
     tableName: string,
     schemaName: string,
     schema: SchemaField[],
   ): Promise<void> {
-    const uniqueColumns = new Map<string, SchemaField>();
+    this.logger.log(
+      `🔍 Detected columns for ${schemaName}.${tableName}:`,
+      schema,
+    );
+
+    const seen = new Set<string>();
+    const records = [];
 
     for (const field of schema) {
       const columnName = field.name?.trim();
-      if (!columnName) continue; // Skip empty names
+      if (!columnName) {
+        this.logger.warn(
+          `⚠️ Skipping column with invalid name in ${schemaName}.${tableName}`,
+        );
+        continue;
+      }
 
-      if (!uniqueColumns.has(columnName)) {
-        uniqueColumns.set(columnName, { name: columnName, type: field.type });
+      const key = `${schemaName}.${tableName}.${columnName}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+
+        records.push(
+          this.columnRepo.create({
+            table_name: tableName,
+            schema_name: schemaName,
+            column_name: columnName,
+            type: field.type,
+          }),
+        );
       }
     }
 
-    if (uniqueColumns.size === 0) {
+    if (records.length === 0) {
       this.logger.warn(
-        `No valid or unique columns found for table "${tableName}" in schema "${schemaName}". Skipping insert.`,
+        `🚫 No valid or unique columns found for table "${tableName}" in schema "${schemaName}". Skipping insert.`,
       );
       return;
     }
 
-    const records = Array.from(uniqueColumns.values()).map((field) =>
-      this.columnRepo.create({
-        table_name: tableName,
-        schema_name: schemaName,
-        column_name: field.name,
-        type: field.type,
-      }),
-    );
-
     try {
       await this.columnRepo.save(records);
       this.logger.log(
-        `Inserted ${records.length} unique columns for ${tableName} in schema ${schemaName}`,
+        `✅ Inserted ${records.length} columns for ${tableName} in schema ${schemaName}`,
       );
     } catch (error) {
       this.logger.error(
-        `Error inserting schema for ${tableName} in schema ${schemaName}: ${error.message}`,
+        `❌ Error inserting schema for ${tableName} in schema ${schemaName}: ${error.message}`,
       );
       throw new HttpException(
         `DB insert failed for ${tableName} in schema ${schemaName}: ${error.message}`,
