@@ -1,20 +1,20 @@
 // table-column.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
 
-@Entity('table_columns')
+@Entity("table_columns")
 export class TableColumnEntity {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ nullable: true })
   table_name: string;
 
-  @Column()
+  @Column({ nullable: true })
   schema_name: string;
 
-  @Column()
+  @Column({ nullable: true })
   column_name: string;
 
-  @Column()
+  @Column({ nullable: true })
   type: string;
 }

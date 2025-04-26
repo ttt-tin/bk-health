@@ -77,7 +77,7 @@ export class UploadS3Service {
           relativePath ? `${relativePath}/${filename}` : filename, // Ensure correct path handling
           baseDestFolder,
         );
-      } else if (stat.isFile() && filename.endsWith(".json")) {
+      } else if (stat.isFile() && (filename.endsWith(".json") || filename.endsWith(".csv"))) {
         console.log(`Uploading file: ${filename}`);
 
         // Ensure proper S3 key structure without unnecessary "./"
@@ -126,7 +126,7 @@ export class UploadS3Service {
       ) {
         // Only upload CSV files
         // Construct S3 key using partitioned structure
-        const s3Key = path.join(`standard/${destFolder}/${partitionFolder}`, filename); // Chỉ sử dụng partitionFolder cho S3 key
+        const s3Key = path.join(`${destFolder}/${partitionFolder}`, filename); // Chỉ sử dụng partitionFolder cho S3 key
         await this.uploadFile(filePath, s3Key, bucket);
       }
     }

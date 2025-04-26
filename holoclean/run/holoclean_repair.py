@@ -13,6 +13,7 @@ import psycopg2
 from dotenv import load_dotenv
 from pyathena import connect
 import uuid
+from mapping import map_all_tables_from_folder
 
 load_dotenv()
 
@@ -41,6 +42,11 @@ s3_output_database = os.getenv('S3_DATABASE')
 #     weight_norm=False,
 #     print_fw=True
 # ).session
+
+
+# # Ví dụ sử dụng hàm
+input_folder_path = "./output"
+map_all_tables_from_folder(input_folder_path)
 
 if not os.path.exists(data_folder):
     print(f"Error: Data folder '{data_folder}' does not exist.")

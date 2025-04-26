@@ -5,9 +5,8 @@ import json
 import os
 from tqdm import tqdm
 import shutil
-from upload import upload_file_to_nestjs_api
+from upload import upload_file_to_nestjs_api, clear_output_folder
 from dotenv import load_dotenv
-from mapping import map_all_tables_from_folder
 
 load_dotenv()
 
@@ -93,24 +92,39 @@ def cleanAndRename(patient_df,
     try:
         for df in [patient_df, careplan_df, condition_df, diagnostic_report_df,
                     encounter_df, immunization_df, observation_df, procedure_df]:
+            if df is None or  df.empty:
+                continue
             df.columns = df.columns.map(str).str.replace("resource.", "", regex=False)
+
             df.columns = df.columns.map(str).str.replace(".", "_", regex=False)
+
             df.drop(columns=['resourceType'], inplace=True)
         
         for df in [patient_df, condition_df, diagnostic_report_df, observation_df, encounter_df]:
-            df['fullUrl']= df['fullUrl'].str.replace('urn:uuid:', '')
+            if df is None or  df.empty:
+                continue
+            df['fullUrl']= df['fullUrl'].astype(str).str.replace('urn:uuid:', '')
+
             
         for df in [encounter_df, immunization_df]:
-            df['patient_reference'] = df['patient_reference'].map(str).str.replace('urn:uuid:', '')
+            if df is None or  df.empty:
+                continue
+            df['patient_reference'] = df['patient_reference'].astype(str).str.replace('urn:uuid:', '')
             
         for df in [immunization_df, diagnostic_report_df, observation_df, procedure_df]:
-            df['encounter_reference'] = df['encounter_reference'].map(str).str.replace('urn:uuid:', '')
+            if df is None or  df.empty:
+                continue
+            df['encounter_reference'] = df['encounter_reference'].astype(str).str.replace('urn:uuid:', '')
             
         for df in [observation_df, procedure_df, careplan_df, condition_df, diagnostic_report_df]:
-            df['subject_reference'] = df['subject_reference'].map(str).str.replace('urn:uuid:', '')
+            if df is None or  df.empty:
+                continue
+            df['subject_reference'] = df['subject_reference'].astype(str).str.replace('urn:uuid:', '')
 
         for df in [careplan_df, condition_df]:
-            df['context_reference'] = df['context_reference'].map(str).str.replace('urn:uuid:', '')
+            if df is None or  df.empty:
+                continue
+            df['context_reference'] = df['context_reference'].astype(str).str.replace('urn:uuid:', '')
     except Exception as e:
         print(f"Error processing: {e}")
         
@@ -209,7 +223,7 @@ def processProcedure(procedure_df):
     try:
         procedure_df = procedure_df.rename(columns={'code.text': 'code'})
         procedure_df.drop(columns=['code.coding'], inplace=True)
-        procedure_df['reasonReference_reference'] = procedure_df['reasonReference_reference'].map(str).str.replace('urn:uuid:', '') if 'reasonReference_reference' in procedure_df.columns.tolist() else pd.NA
+        procedure_df['reasonReference_reference'] = procedure_df['reasonReference_reference'].astype(str).str.replace('urn:uuid:', '') if 'reasonReference_reference' in procedure_df.columns.tolist() else pd.NA
     except Exception as e:
         print(f"Error processing: {e}")
     return procedure_df
@@ -229,11 +243,11 @@ def generateUnstructuredMetadata(additional_data_path, output_folder):
                     "url": file_path  # Full path to the file
                 })
         
-        # Save file metadata to CSV
-        file_metadata_df = pd.DataFrame(file_metadata)
-        file_metadata_csv_path = os.path.join(output_folder, "additional_file_metadata.csv")
-        file_metadata_df.to_csv(file_metadata_csv_path, index=False)
-        print(f"Additional file metadata has been saved to: {file_metadata_csv_path}")
+        # # Save file metadata to CSV
+        # file_metadata_df = pd.DataFrame(file_metadata)
+        # file_metadata_csv_path = os.path.join(output_folder, "additional_file_metadata.csv")
+        # file_metadata_df.to_csv(file_metadata_csv_path, index=False)
+        # print(f"Additional file metadata has been saved to: {file_metadata_csv_path}")
     except Exception as e:
         print(f"Error processing: {e}")
 
@@ -310,40 +324,42 @@ def main():
                         patient_df, careplan_df, condition_df, diagnostic_report_df, encounter_df, immunization_df, observation_df, procedure_df
                     )
                     
-                    # Save each DataFrame to a separate CSV file
                     output_folder = "./output/" + folder_structure
                     print('folder_structure', folder_structure)
-                    os.makedirs(output_folder, exist_ok=True)  # Ensure output folder exists
+                    clear_output_folder(output_folder)
+                    os.makedirs(output_folder, exist_ok=True)
 
-                    for folder, filename in csv_files:
-                        src_path = os.path.join(folder, filename)
-                        dest_path = os.path.join(output_folder, filename)
-                        shutil.copy(src_path, dest_path)
-                        print(f"Copied CSV file: {src_path} -> {dest_path}")
+                    if (csv_files and len(csv_files) > 0):
+                        for folder, filename in csv_files:
+                            src_path = os.path.join(folder, filename)
+                            first_letter = filename.split('_')[0]
+                            dest_dir = os.path.join(output_folder, first_letter)
+                            os.makedirs(dest_dir, exist_ok=True)
+                            dest_path = os.path.join(dest_dir, filename)
+                            try:
+                                shutil.copy(src_path, dest_path)
+                                print(f"Copied CSV file: {src_path} -> {dest_path}")
+                            except Exception as e:
+                                print(f"Error copying file: {e}")
+                    else:
+                        save_csv_to_folder(patient_df, "patient", "patient_data", output_folder)
+                        save_csv_to_folder(careplan_df, "careplan", "careplan_data", output_folder)
+                        save_csv_to_folder(condition_df, "condition", "condition_data", output_folder)
+                        save_csv_to_folder(diagnostic_report_df, "diagnostic_report", "diagnostic_report_data", output_folder)
+                        save_csv_to_folder(encounter_df, "encounter", "encounter_data", output_folder)
+                        save_csv_to_folder(immunization_df, "immunization", "immunization_data", output_folder)
+                        save_csv_to_folder(observation_df, "observation", "observation_data", output_folder)
+                        save_csv_to_folder(procedure_df, "procedure", "procedure_data", output_folder)
                     
-                    save_csv_to_folder(patient_df, "patient", "patient_data", output_folder)
-                    save_csv_to_folder(careplan_df, "careplan", "careplan_data", output_folder)
-                    save_csv_to_folder(condition_df, "condition", "condition_data", output_folder)
-                    save_csv_to_folder(diagnostic_report_df, "diagnostic_report", "diagnostic_report_data", output_folder)
-                    save_csv_to_folder(encounter_df, "encounter", "encounter_data", output_folder)
-                    save_csv_to_folder(immunization_df, "immunization", "immunization_data", output_folder)
-                    save_csv_to_folder(observation_df, "observation", "observation_data", output_folder)
-                    save_csv_to_folder(procedure_df, "procedure", "procedure_data", output_folder)
-                    
-                    additional_data_path = "./data/unstructure"
-                    generateUnstructuredMetadata(additional_data_path, output_folder)
+                    # additional_data_path = "./data/unstructure"
+                    # generateUnstructuredMetadata(additional_data_path, output_folder)
                     
                     print("All DataFrames have been exported as CSV files in the 'output' folder.")
                     aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
                     aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
                     region_name=os.getenv('AWS_REGION')
 
-                    # # Ví dụ sử dụng hàm
-                    input_folder_path = "./output"
-                    mapping_json_path = "mapping.json"
-                    map_all_tables_from_folder(input_folder_path, mapping_json_path)
-
-                    upload_file_to_nestjs_api('./standard', 'bk-health-bucket-raw')
+                    upload_file_to_nestjs_api('./output', 'bk-health-bucket-raw')
             except Exception as e:
                 print(f"Error processing: {e}")
 
