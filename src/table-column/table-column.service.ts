@@ -259,7 +259,7 @@ export class TableColumnService {
 
           try {
             this.logger.log(`Detecting schema from: ${key}`);
-            const schema = await this.detectCsvSchema(bucket, key, sampleLines);
+            const schema = await this.detectCsvSchema(bucket, key);
             await this.insertSchemaIntoDatabaseBulk(
               tableName,
               schemaName,
@@ -289,7 +289,6 @@ export class TableColumnService {
   private async detectCsvSchema(
     bucket: string,
     key: string,
-    sampleLines: number,
   ): Promise<SchemaField[]> {
     const getObjectCommand = new GetObjectCommand({ Bucket: bucket, Key: key });
     const response = await this.s3Client.send(getObjectCommand);
@@ -297,8 +296,6 @@ export class TableColumnService {
     if (!stream) throw new Error(`Empty stream for file: ${key}`);
 
     let header: string[] = [];
-    let dataTypes: string[] = [];
-    let linesParsed = 0;
     let stopStream = false;
 
     const parser = stream.pipe(
@@ -316,24 +313,9 @@ export class TableColumnService {
       transform: (row: string[], _, callback) => {
         if (stopStream) return callback();
 
-        if (linesParsed === 0) {
+        if (!header.length) {
           header = row.map((col) => col.trim());
-          dataTypes = Array(header.length).fill("string");
-        } else if (linesParsed <= sampleLines) {
-          for (let i = 0; i < Math.min(row.length, header.length); i++) {
-            const val = row[i]?.trim();
-            if (val === "") continue;
-            if (/^-?\d+$/.test(val)) {
-              dataTypes[i] = "int";
-            } else if (/^-?\d*\.\d+$/.test(val)) {
-              dataTypes[i] = "double";
-            }
-          }
-        }
-
-        linesParsed++;
-        if (linesParsed > sampleLines) {
-          stopStream = true;
+          stopStream = true; // Only read header row
         }
 
         callback(null, row);
@@ -349,11 +331,11 @@ export class TableColumnService {
       stream.on("error", reject);
     });
 
-    // Final cleaning + return
+    // Return all fields as type "string"
     return header
-      .map((name, i) => ({
+      .map((name) => ({
         name: name?.trim(),
-        type: dataTypes[i] || "string",
+        type: "string",
       }))
       .filter((f) => f.name); // Ensure no empty/null column names
   }

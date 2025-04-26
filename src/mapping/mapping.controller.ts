@@ -49,7 +49,7 @@ export class MappingController {
     from_iso8601_timestamp('${now}')
   );
 `;
-
+        console.log(query);
         await this.athenaService.executeQuery(query);
       }
 
