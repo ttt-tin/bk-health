@@ -1,27 +1,34 @@
-import { Controller, Get, Post, Body, Param, Put, Delete } from '@nestjs/common';
-import { MappingService } from './mapping.service';
-import { CreateMappingDto } from './dto/create-mapping.dto';
-import { UpdateMappingDto } from './dto/update-mapping.dto';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Put,
+  Delete,
+} from "@nestjs/common";
+import { MappingService } from "./mapping.service";
+import { CreateMappingDto } from "./dto/create-mapping.dto";
+import { UpdateMappingDto } from "./dto/update-mapping.dto";
 
-@Controller('mappings')
+@Controller("mappings")
 export class MappingController {
   constructor(private readonly mappingService: MappingService) {}
 
   @Post()
   async create(@Body() createMappingDtos: CreateMappingDto[]) {
     try {
-      console.log(createMappingDtos)
+      console.log(createMappingDtos);
       const results = await this.mappingService.create(createMappingDtos);
       return {
         data: results,
-        success: true
-      }
-    }
-    catch (error) {
+        success: true,
+      };
+    } catch (error) {
       return {
         message: error.message,
-        success: false
-      }
+        success: false,
+      };
     }
   }
 
@@ -30,23 +37,36 @@ export class MappingController {
     return this.mappingService.findAll();
   }
 
-  @Get(':dbName')
-  findByDBName(@Param('dbName') dbName: string) {
+  @Get("test")
+  test() {
+    return this.mappingService.uploadMappingToS3();
+  }
+
+  @Get(":dbName")
+  findByDBName(@Param("dbName") dbName: string) {
     return this.mappingService.findByDBName(dbName);
   }
 
-  @Get(':dbName/:dbTableName/:standardTabeName')
-  findMapping(@Param('dbName') dbName: string, @Param('dbTableName') dbTableName: string, @Param('standardTabeName') standardTabeName: string) {
-    return this.mappingService.findMapping(dbName, dbTableName, standardTabeName);
+  @Get(":dbName/:dbTableName/:standardTabeName")
+  findMapping(
+    @Param("dbName") dbName: string,
+    @Param("dbTableName") dbTableName: string,
+    @Param("standardTabeName") standardTabeName: string,
+  ) {
+    return this.mappingService.findMapping(
+      dbName,
+      dbTableName,
+      standardTabeName,
+    );
   }
 
-  @Put(':id')
-  update(@Param('id') id: number, @Body() updateMappingDto: UpdateMappingDto) {
+  @Put(":id")
+  update(@Param("id") id: number, @Body() updateMappingDto: UpdateMappingDto) {
     return this.mappingService.update(id, updateMappingDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: number) {
+  @Delete(":id")
+  remove(@Param("id") id: number) {
     return this.mappingService.remove(id);
   }
 }

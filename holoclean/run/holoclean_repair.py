@@ -22,6 +22,9 @@ data_folder = 'standard'
 constraint_folder = 'constraint'
 s3_output_database = os.getenv('S3_DATABASE')
 
+HOSPITAL_DATA = 'hospital_data'
+BK_HEALTH_LAKEHOUSE_DB = 'bk_health_lakehouse_db'
+
 # # 1. Setup a HoloClean session
 # hc = holoclean.HoloClean(
 #     db_name='holo',
@@ -412,7 +415,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
 
                 if len(keys_unique) == 0:
                     insert_key_query = f"""
-                        INSERT INTO hospital_data.tables (id, table_name, column_name) VALUES 
+                        INSERT INTO {BK_HEALTH_LAKEHOUSE_DB}.tables (id, table_name, column_name) VALUES 
                         ('{str(uuid.uuid4())}', '{table_name}', 'id');
                     """
                     cursor.execute(insert_key_query)
@@ -566,7 +569,7 @@ def setup_mapping_table(database_name, table_name):
         cursor = conn.cursor()
         
         create_table_query = f"""
-            CREATE TABLE IF NOT EXISTS hospital_data.{table_name}_repaired_id_mapping (
+            CREATE TABLE IF NOT EXISTS {BK_HEALTH_LAKEHOUSE_DB}.{table_name}_id_mapping (
                 id STRING,
                 database_name STRING,
                 old_id STRING,
@@ -613,7 +616,7 @@ def check_exist_id_mapping(database_name, table_name, old_id, new_id):
         cursor = conn.cursor()
 
         query = f"""
-        SELECT COUNT(*) FROM hospital_data.{table_name}_id_mapping
+        SELECT COUNT(*) FROM {BK_HEALTH_LAKEHOUSE_DB}.{table_name}_id_mapping
         WHERE old_id = '{old_id}' AND new_id = '{new_id}' AND table_name = '{table_name}' AND database_name = '{database_name}';
         """
         cursor.execute(query)
@@ -650,7 +653,7 @@ def generate_insert_query_for_id_mapping(table_name, id_value, database_name, ol
         created_at = datetime.now().strftime('%Y%m%d%H%M%S')
 
         # Tên bảng đầy đủ
-        full_table_name = f"hospital_data.{table_name}_id_mapping"
+        full_table_name = f"{BK_HEALTH_LAKEHOUSE_DB}.{table_name}_id_mapping"
         
         # Format giá trị để tránh lỗi SQL
         database_name_safe = database_name.replace("'", "''") if database_name else None
@@ -736,119 +739,7 @@ def get_db_connection():
         host=host,
         port=port
     )
-
-# def process_and_insert_data(merged_df, base_name, output_bucket, database, region):
-#     """Process data and insert with mapping"""
-#     try:
-#         # Process with HoloClean
-#         hc.load_data(base_name, merged_df)
-#         hc.load_dcs(os.path.join(constraint_folder, f'{base_name}_constraints.txt'))
-#         hc.ds.set_constraints(hc.get_dcs())
-        
-#         detectors = [NullDetector(), ViolationDetector()]
-#         hc.detect_errors(detectors)
-        
-#         featurizers = [
-#             InitAttrFeaturizer(),
-#             OccurAttrFeaturizer(),
-#             FreqFeaturizer(),
-#             ConstraintFeaturizer(),
-#         ]
-#         hc.repair_errors(featurizers)
-        
-#         # Get processed data
-#         repaired_df = hc.get_repaired_dataframe()
-        
-#         # Update relation IDs
-#         repaired_df = update_relation_ids(repaired_df, base_name)
-        
-#         # Save mapping
-#         connection = get_db_connection()
-#         cursor = connection.cursor()
-        
-#         # Assuming there's an 'id' column in the original data
-#         if 'id' in repaired_df.columns:
-#             for _, row in repaired_df.iterrows():
-#                 old_id = row['id']
-#                 new_id = str(uuid.uuid4())  # Generate new UUID
-#                 cursor.execute("""
-#                     INSERT INTO id_mapping (database_name, old_id, new_id, table_name)
-#                     VALUES (%s, %s, %s, %s)
-#                 """, (database, old_id, new_id, base_name))
-#                 repaired_df.loc[repaired_df['id'] == old_id, 'id'] = new_id
-        
-#         # Insert to Athena
-#         conn = connect(
-#             aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-#             aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
-#             s3_staging_dir=output_bucket,
-#             region_name=region,
-#             schema_name=database
-#         )
-        
-#         cursor = conn.cursor()
-#         table_name = f'{base_name}_repaired'
-
-#         create_query = generate_create_table_query_from_db(database, table_name, repaired_df)
-#         cursor.execute(create_query)
-
-#         select_query = f"""
-#             SELECT 
-#                 id,
-#                 table_reference AS tableReference,
-#                 table_was_reference AS tableWasReference,
-#                 pri_key AS priKey,
-#                 fo_key AS foKey
-#             FROM {database}.relationships
-#             WHERE table_reference = '{base_name}'
-#         """
-
-#         cursor.execute(select_query)
-#         rows = cursor.fetchall()
-#         for row in rows:
-#             print(f"ID: {row[0]}, TableReference: {row[1]}, TableWasReference: {row[2]}, PriKey: {row[3]}, FoKey: {row[4]}")
-        
-#         # Create table and insert data
-#         insert_query, key_id = generate_insert_query_from_db(database, table_name, repaired_df)
-        
-#         cursor.execute(insert_query)
-        
-#         connection.commit()
-#         logging.info(f"Successfully processed and inserted data for {base_name}")
-#         print(f"Processed database: {database}, table: {table_name}")
-        
-#     except Exception as e:
-#         error_file = save_error_data(repaired_df, database, base_name, str(e))
-#         logging.error(f"Error processing {base_name}: {e}")
-#     finally:
-#         if connection:
-#             connection.close()
-
-# def cron_job_reprocess_errors():
-#     """Cron job to reprocess error data"""
-#     for database_name in os.listdir(error_folder):
-#         db_path = os.path.join(error_folder, database_name)
-#         if not os.path.isdir(db_path):
-#             continue
-            
-#         for table_name in os.listdir(db_path):
-#             table_path = os.path.join(db_path, table_name)
-#             for error_file in os.listdir(table_path):
-#                 file_path = os.path.join(table_path, error_file)
-                
-#                 try:
-#                     df = pd.read_csv(file_path)
-#                     output_bucket = os.getenv('S3_OUTPUT_BUCKET')
-#                     region = os.getenv('AWS_REGION')
-                    
-#                     process_and_insert_data(df, table_name, output_bucket, database_name, region)
-                    
-#                     # If successful, remove the error file
-#                     os.remove(file_path)
-#                     logging.info(f"Successfully reprocessed and removed {file_path}")
-#                 except Exception as e:
-#                     logging.error(f"Failed to reprocess {file_path}: {e}")
-# # Main execution
+# Main execution
 
 def merge_csv_files_in_folder(folder_path):
     """
@@ -961,7 +852,7 @@ for database_name in os.listdir(data_folder):
             database = os.getenv('S3_DATABASE')
             region = os.getenv('AWS_REGION')
 
-            execute_athena_query(database, output_bucket, f'{base_name}_repaired', region, database_name)
+            execute_athena_query(database, output_bucket, f'{base_name}', region, database_name)
 
             print(f"Finished processing dataset: {base_name}")
 
