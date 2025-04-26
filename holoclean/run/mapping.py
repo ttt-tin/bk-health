@@ -5,10 +5,11 @@ import psycopg2
 from datetime import datetime
 from dotenv import load_dotenv
 import numpy as np
+from pyathena import connect
 
 load_dotenv()
 output_bucket = os.getenv('S3_OUTPUT_BUCKET')
-database = os.getenv('S3_DATABASE')
+database = 'bk_health_lakehouse_db'
 region = os.getenv('AWS_REGION')
 conn = connect(
     aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
@@ -78,7 +79,7 @@ def map_all_tables_from_folder(input_folder):
                         table_name = parts[1] if len(parts) > 1 else source_table_name
 
                         # Load mapping
-                        table_mapping = load_mapping_from_postgres(db_name, table_name).get(table_name, {})
+                        table_mapping = load_mapping_from_athena(db_name, table_name).get(table_name, {})
                         print(f"Mapping for {db_name}/{table_name}: {table_mapping}")
 
                         # Read source data
