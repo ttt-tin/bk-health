@@ -19,8 +19,14 @@ export class AthenaController {
     @Body("id") id: string,
     @Body("table_name") tableName: string,
     @Body("column_name") columnName: string,
+    @Body("database") database: string,
   ) {
-    await this.athenaService.updateTableMetadata(id, tableName, columnName);
+    await this.athenaService.updateTableMetadata(
+      id,
+      tableName,
+      columnName,
+      database,
+    );
     return { message: "Data updated successfully" };
   }
 

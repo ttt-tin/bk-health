@@ -173,21 +173,22 @@ export class AthenaService {
     id: string,
     tableName: string,
     columnName: string,
+    database?: string,
   ): Promise<void> {
     if (!id) {
       const generatedId = uuidv4();
       const query = `
-        INSERT INTO ${this.DATABASE_NAME}.tables (id, table_name, column_name)
+        INSERT INTO tables (id, table_name, column_name)
         VALUES ('${generatedId}', '${tableName}', '${columnName}');
       `;
-      await this.executeQuery(query);
+      await this.executeQuery(query, database);
     } else {
       const query = `
         UPDATE tables
         SET table_name = '${tableName}', column_name = '${columnName}'
         WHERE id = '${id}';
       `;
-      await this.executeQuery(query);
+      await this.executeQuery(query, database);
     }
   }
 
