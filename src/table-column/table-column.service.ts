@@ -122,7 +122,6 @@ export class TableColumnService {
         .andWhere("column.table_name IS NOT NULL")
         .getRawMany();
 
-
       return tables.map((t) => t.table_name);
     } catch (error) {
       this.logger.error(
@@ -453,9 +452,18 @@ export class TableColumnService {
     tableName: string,
     columns: { name: string; type: string }[],
   ): string {
-    const columnDefs = columns
+    // Check if key_id exists
+    const hasKeyId = columns.some((col) => col.name.toLowerCase() === "key_id");
+
+    // If not, add it manually
+    const finalColumns = hasKeyId
+      ? columns
+      : [{ name: "key_id", type: "string" }, ...columns];
+
+    const columnDefs = finalColumns
       .map((col) => `\`${col.name}\` ${col.type}`)
       .join(",\n  ");
+
     return `
       CREATE TABLE IF NOT EXISTS hospital_data.${tableName} (
         ${columnDefs}

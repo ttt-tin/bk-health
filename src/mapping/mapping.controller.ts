@@ -27,7 +27,7 @@ export class MappingController {
         const id = uuidv4();
         const now = new Date().toISOString(); // ISO string format
         const query = `
-  INSERT INTO bk_health_lakehouse_db.mappings (
+  INSERT INTO bk_health_lakehouse_db.mapping (
     id,
     db_name,
     db_table,
@@ -71,7 +71,7 @@ export class MappingController {
     try {
       // Construct the Athena query to fetch all mappings
       const query = `
-        SELECT * FROM bk_health_lakehouse_db.mappings
+        SELECT * FROM bk_health_lakehouse_db.mapping
       `;
 
       // Execute the query using AthenaService
