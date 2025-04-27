@@ -23,6 +23,7 @@ export class MappingController {
   @Post()
   async create(@Body() createMappingDtos: CreateMappingDto[]) {
     try {
+      console.log(JSON.stringify(createMappingDtos));
       for (const dto of createMappingDtos) {
         const id = uuidv4();
         const now = new Date().toISOString(); // ISO string format

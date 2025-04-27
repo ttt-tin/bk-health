@@ -267,4 +267,31 @@ export class AthenaService {
       return [];
     }
   }
+
+  async getUniversalKeys(
+    tableName: string,
+    database: string,
+  ): Promise<string[]> {
+    try {
+      // Construct the Athena query to get columns for the given table and database
+      const query = `
+        SELECT column_name 
+        FROM bk_health_lakehouse_db.tables 
+        WHERE table_name = '${tableName}'
+      `;
+
+      // Execute the Athena query to get the columns
+      const result = await this.executeQuery(query);
+
+      // If there are columns, return them
+      if (result && result.length > 0) {
+        return result.map((row) => row.column_name); // Assuming the result has a 'column_name' field
+      }
+
+      return []; // Return an empty array if no columns are found
+    } catch (error) {
+      console.error("Error fetching universal keys from Athena:", error);
+      throw new Error("Failed to fetch universal keys");
+    }
+  }
 }

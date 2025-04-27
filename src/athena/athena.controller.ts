@@ -8,11 +8,44 @@ import {
   Post,
   BadRequestException,
 } from "@nestjs/common";
+import { v4 as uuidv4 } from "uuid";
 import { AthenaService } from "./athena.service";
 
 @Controller("athena")
 export class AthenaController {
   constructor(private readonly athenaService: AthenaService) {}
+
+  @Post("universal-keys")
+  async addUniversalKeys(
+    @Body("database") database: string,
+    @Body("table_name") table_name: string,
+    @Body("universal_keys") universal_keys: string[][],
+  ) {
+    try {
+      // Loop through each universal key and insert it as a concatenated string
+      for (const fields of universal_keys) {
+        const concatenatedFields = fields.join(","); // Concatenate fields with commas
+        const id = uuidv4(); // Generate a new unique ID for each universal key
+
+        // Construct the query to insert the universal key (concatenated string)
+        const query = `
+          INSERT INTO ${process.env.BK_HEALTH_LAKEHOUSE_DB}.tables (id, table_name, column_name)
+          VALUES ('${id}', '${table_name}', '${concatenatedFields}');
+        `;
+
+        // Execute the query
+        await this.athenaService.executeQuery(query);
+      }
+
+      return { message: "Universal keys added successfully!" };
+    } catch (error) {
+      console.error("Error inserting universal keys:", error);
+      return {
+        message: "Failed to insert universal keys",
+        error: error.message,
+      };
+    }
+  }
 
   @Post("create")
   async createTableMetadata(
@@ -28,6 +61,23 @@ export class AthenaController {
       database,
     );
     return { message: "Data updated successfully" };
+  }
+
+  @Get("universal-keys")
+  async getUniversalKeys(
+    @Query("table_name") tableName: string,
+    @Query("database") database: string,
+  ) {
+    try {
+      const universalKeys = await this.athenaService.getUniversalKeys(
+        tableName,
+        database,
+      );
+      return { universal_keys: universalKeys };
+    } catch (error) {
+      console.error("Error fetching universal keys:", error);
+      throw new Error("Failed to fetch universal keys");
+    }
   }
 
   @Get("metadata")
