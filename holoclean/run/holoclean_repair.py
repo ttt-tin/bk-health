@@ -624,7 +624,7 @@ def check_exist_id_mapping(database_name, table_name, old_id, new_id):
         cursor.execute(query)
         result = cursor.fetchone()
         
-        return result[0] > 0 if result else False
+        return len(result) > 0 if result else False
     
     except Exception as e:
         logging.error(f"Lỗi khi kiểm tra tồn tại ID mapping: {e}")
