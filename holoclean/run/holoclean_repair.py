@@ -214,6 +214,8 @@ def generate_insert_query_from_db(database, table_name, table_structure, row_dat
     try:
         KEY_ID = str(uuid.uuid4())
         row_data = dict(row_data)
+
+        row_data.pop("_tid_", None)
         if "key_id" not in row_data:
             row_data["key_id"] = KEY_ID
         
@@ -269,7 +271,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     table_was_reference AS tableWasReference,
                     pri_key AS priKey,
                     fo_key AS foKey
-                FROM {database}.relationships
+                FROM {BK_HEALTH_LAKEHOUSE_DB}.relationships
                 WHERE table_reference = '{table_name}'
             """
 
@@ -294,7 +296,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     try:
                         mapping_data_query = f"""
                             SELECT *
-                            FROM {database}.{relation['tableWasReference']}_id_mapping
+                            FROM {BK_HEALTH_LAKEHOUSE_DB}.{relation['tableWasReference']}_id_mapping
                             WHERE old_id = '{record[relation['foKey']]}'
                             AND database_name = '{database_name}'
                             AND table_name = '{relation['tableWasReference']}'
@@ -345,7 +347,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     try:
                         get_mapping_data_query = f"""
                             SELECT *
-                            FROM {database}.{relation['tableWasReference']}_id_mapping
+                            FROM {BK_HEALTH_LAKEHOUSE_DB}.{relation['tableWasReference']}_id_mapping
                         """
 
                         cursor.execute(get_mapping_data_query)
@@ -406,7 +408,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                 get_key_query = f"""
                 SELECT 
                     *
-                FROM {database}.tables
+                FROM {BK_HEALTH_LAKEHOUSE_DB}.tables
                 WHERE table_name = '{table_name}'
                 """
 
@@ -423,7 +425,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     get_key_query = f"""
                     SELECT 
                         *
-                    FROM {database}.tables
+                    FROM {BK_HEALTH_LAKEHOUSE_DB}.tables
                     WHERE table_name = '{table_name}'
                     """
 

@@ -6,6 +6,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import numpy as np
 from pyathena import connect
+import boto3
 
 load_dotenv()
 output_bucket = os.getenv('S3_OUTPUT_BUCKET')
@@ -58,6 +59,8 @@ def map_all_tables_from_folder(input_folder):
     Chuẩn hóa tất cả các file CSV trong thư mục đầu vào.
     Lưu file vào ./standard nếu mapping thành công, hoặc ./missing_mapping nếu thiếu mapping hoặc key.
     """
+
+    print('map_all_tables_from_folder', input_folder)
     try:
         for root, _, files in os.walk(input_folder):
             print(f"Processing folder: {root}")
@@ -150,6 +153,45 @@ def save_to_missing_mapping(input_folder, root, source_table_name, source_data, 
     output_csv_path = os.path.join(output_folder, output_csv_name)
     source_data.to_csv(output_csv_path, index=False)
     print(f"⚠️ Saved to missing_mapping: {output_csv_path} (Reason: {reason})")
+
+    upload_missing_mapping_to_s3(input_folder, root, source_table_name, source_data, reason="Unknown")
+
+def upload_missing_mapping_to_s3(input_folder, root, source_table_name, source_data, reason="Unknown"):
+    """
+    Lưu file lỗi lên S3 bucket 'bk-health-bucket-error' theo folder ngày + giờ: missing_mapping/YYYY/MM/DD/HH/
+    """
+    try:
+        # Generate timestamp
+        now = datetime.now()
+        year = now.strftime("%Y")
+        month = now.strftime("%m")
+        day = now.strftime("%d")
+        hour = now.strftime("%H")
+        timestamp = now.strftime("%Y%m%d%H%M%S")
+
+        # S3 key structure
+        relative_path = os.path.relpath(root, input_folder)
+        output_csv_name = f"{source_table_name}_missing_{timestamp}.csv"
+        s3_folder_path = f"missing_mapping/{year}/{month}/{day}/{hour}/{relative_path}".strip("/")
+        s3_key = f"{s3_folder_path}/{output_csv_name}"
+
+        # Save temporary local file
+        local_temp_path = f"/tmp/{output_csv_name}"
+        source_data.to_csv(local_temp_path, index=False)
+
+        # Upload to S3
+        s3 = boto3.client('s3',
+            aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+            aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+            region_name=os.getenv('AWS_REGION')
+        )
+        bucket_name = "bk-health-bucket-error"
+        s3.upload_file(local_temp_path, bucket_name, s3_key)
+
+        print(f"⚠️ Saved missing mapping to s3://{bucket_name}/{s3_key} (Reason: {reason})")
+
+    except Exception as e:
+        print(f"❌ Failed to save missing mapping to S3: {e}")
 
 # Run the script
 input_folder_path = "./output"
