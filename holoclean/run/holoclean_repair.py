@@ -165,39 +165,6 @@ def generate_create_table_query_from_db(prefix, table_name, table_structure):
         print(f"Lỗi khi tạo câu lệnh CREATE TABLE: {e}")
         return None
 
-# def generate_insert_query_from_db(prefix, table_name, table_structure):
-#     """
-#     Tạo câu lệnh INSERT INTO từ dữ liệu bảng.
-#     """
-#     try:
-#         rows = table_structure['data']
-#         column_names = table_structure['column_names']
-
-#         # Chuẩn bị câu lệnh INSERT
-#         query = f"INSERT INTO \"{prefix}\".\"{table_name}\" ({', '.join(column_names)}) VALUES\n"
-#         values_list = []
-
-#         # Duyệt qua các hàng dữ liệu
-#         for row in rows:
-#             values = []
-#             for value in row:
-#                 if value is None:  # Xử lý NULL
-#                     values.append("NULL")
-#                 elif isinstance(value, str):  # Xử lý chuỗi
-#                     # Sử dụng cách thay thế dấu nháy đơn mà không sử dụng f-string
-#                     values.append("'" + value.replace("'", "''") + "'")
-#                 else:  # Xử lý số, boolean
-#                     values.append(str(value))
-
-
-#             values_list.append(f"({', '.join(values)})")
-
-#         query += ",\n".join(values_list) + ";"
-#         return query
-#     except Exception as e:
-#         print(f"Lỗi khi tạo câu lệnh INSERT INTO: {e}")
-#         return None
-
 def generate_insert_query_from_db(database, table_name, table_structure, row_data):
     """
     Generate a single INSERT INTO query for one row of data.
@@ -214,6 +181,8 @@ def generate_insert_query_from_db(database, table_name, table_structure, row_dat
     try:
         KEY_ID = str(uuid.uuid4())
         row_data = dict(row_data)
+
+        row_data.pop("_tid_", None)
         if "key_id" not in row_data:
             row_data["key_id"] = KEY_ID
         
@@ -269,7 +238,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     table_was_reference AS tableWasReference,
                     pri_key AS priKey,
                     fo_key AS foKey
-                FROM {database}.relationships
+                FROM {BK_HEALTH_LAKEHOUSE_DB}.relationships
                 WHERE table_reference = '{table_name}'
             """
 
@@ -294,7 +263,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     try:
                         mapping_data_query = f"""
                             SELECT *
-                            FROM {database}.{relation['tableWasReference']}_id_mapping
+                            FROM {BK_HEALTH_LAKEHOUSE_DB}.{relation['tableWasReference']}_id_mapping
                             WHERE old_id = '{record[relation['foKey']]}'
                             AND database_name = '{database_name}'
                             AND table_name = '{relation['tableWasReference']}'
@@ -345,7 +314,7 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                     try:
                         get_mapping_data_query = f"""
                             SELECT *
-                            FROM {database}.{relation['tableWasReference']}_id_mapping
+                            FROM {BK_HEALTH_LAKEHOUSE_DB}.{relation['tableWasReference']}_id_mapping
                         """
 
                         cursor.execute(get_mapping_data_query)
@@ -406,34 +375,12 @@ def execute_athena_query(database, output_bucket, table_name, region, database_n
                 get_key_query = f"""
                 SELECT 
                     *
-                FROM {database}.tables
+                FROM {BK_HEALTH_LAKEHOUSE_DB}.tables
                 WHERE table_name = '{table_name}'
                 """
 
                 cursor.execute(get_key_query)
                 keys_unique = cursor.fetchall()
-
-                if len(keys_unique) == 0:
-                    insert_key_query = f"""
-                        INSERT INTO {BK_HEALTH_LAKEHOUSE_DB}.tables (id, table_name, column_name) VALUES 
-                        ('{str(uuid.uuid4())}', '{table_name}', 'id');
-                    """
-                    cursor.execute(insert_key_query)
-
-                    get_key_query = f"""
-                    SELECT 
-                        *
-                    FROM {database}.tables
-                    WHERE table_name = '{table_name}'
-                    """
-
-                    cursor.execute(get_key_query)
-                    keys_unique = cursor.fetchall()
-
-
-                IS_EXIST_RECORD = False
-
-
                 print('keys_unique', keys_unique)
                 old_id = record['id']
 

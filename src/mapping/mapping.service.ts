@@ -47,7 +47,7 @@ export class MappingService {
       const result = await this.mappingRepository.save(mapping);
       results.push(result);
     }
-    await this.uploadMappingToS3();
+    // await this.uploadMappingToS3();
     return results;
   }
 
