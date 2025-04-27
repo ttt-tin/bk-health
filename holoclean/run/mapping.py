@@ -192,7 +192,3 @@ def upload_missing_mapping_to_s3(input_folder, root, source_table_name, source_d
 
     except Exception as e:
         print(f"❌ Failed to save missing mapping to S3: {e}")
-
-# Run the script
-input_folder_path = "./output"
-map_all_tables_from_folder(input_folder_path)
