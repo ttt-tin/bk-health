@@ -18,9 +18,9 @@ export class AppController {
 
     console.log("Starting file upload to S3...");
     await this.uploadS3Service.uploadAllFilesInFolder(
-      sourceFolder,
+      `${sourceFolder}/hospital2`,
       destFolder,
-      "hospital1",
+      "hospital2",
     );
     console.log("File upload completed.");
   }
