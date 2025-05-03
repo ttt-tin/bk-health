@@ -692,7 +692,7 @@ def merge_csv_files_in_folder(folder_path):
     """
     Merge tất cả các file CSV trong thư mục con.
     """
-    csv_files = [f for f in os.listdir(folder_path) if f.endswith('.csv')]
+    csv_files = [f for f in os.listdir(folder_path) if f.endswith('.csv') and not f.endswith('_merged.csv')]
     
     if not csv_files:
         print(f"Không có file CSV nào trong thư mục: {folder_path}.")
