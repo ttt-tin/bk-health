@@ -75,6 +75,18 @@ export class NotificationService {
           status: "Success",
           type: "Cleaning",
           desc: "Cleaning run successfully",
+          regDate: new Date("2025-04-30T13:00:00Z"),
+        },
+        {
+          status: "Success",
+          type: "Cleaning",
+          desc: "Cleaning run successfully but some data missing foreign key",
+          regDate: new Date("2025-05-01T14:00:00Z"),
+        },
+        {
+          status: "Success",
+          type: "Cleaning",
+          desc: "Cleaning run successfully but some data missing foreign key",
           regDate: new Date("2025-04-30T15:00:00Z"),
         },
         {
