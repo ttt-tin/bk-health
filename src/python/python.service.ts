@@ -4,13 +4,15 @@ import { spawn } from 'child_process';
 import { HistoryEntity } from './entities/history-run.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
+import { NotificationEntity } from 'src/notification/entities/notification.entity';
 
 @Injectable()
 export class PythonService {
 
   constructor(
     @InjectRepository(HistoryEntity) private historyRepository: Repository<HistoryEntity>,
-  ) {}
+    @InjectRepository(NotificationEntity) private notificationRepository: Repository<NotificationEntity>,
+  ) { }
 
   async runPythonScript(): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -74,7 +76,7 @@ export class PythonService {
 
     const historyEntry = this.historyRepository.create({
       startTime,
-      duration: null, 
+      duration: null,
       status,
     });
 
@@ -99,7 +101,7 @@ export class PythonService {
 
       process.on('close', async (code) => {
         const endTime = new Date();
-        duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000); 
+        duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
 
         if (code === 0) {
           status = 'Completed';
@@ -111,6 +113,13 @@ export class PythonService {
           status,
           duration,
         });
+
+        const notificationEntry = this.notificationRepository.create({
+          type: 'cleaning',
+          status: status,
+        });
+
+        await this.notificationRepository.save(notificationEntry);
 
         if (code === 0) {
           resolve(output.trim());

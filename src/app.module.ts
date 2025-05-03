@@ -17,6 +17,7 @@ import { ExplorerModule } from "./explorer/explorer.module";
 import { MulterModule } from "@nestjs/platform-express";
 import { TableColumnModule } from "./table-column/table-column.module";
 import { DataSourcesModule } from "./data-source/data-sources.module";
+import { NotificationModule } from "./notification/notification.module";
 dotenv.config();
 
 @Module({
@@ -47,8 +48,9 @@ dotenv.config();
     }),
     TableColumnModule,
     DataSourcesModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

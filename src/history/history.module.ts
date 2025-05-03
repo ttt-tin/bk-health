@@ -2,8 +2,8 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { HistoryService } from "./history.service";
-import { HistoryEntity } from "../python/entities/history-run.entity";
 import { HistoryController } from "./history.controller";
+import { HistoryEntity } from "./entities/history-run.entity";
 
 @Module({
   imports: [TypeOrmModule.forFeature([HistoryEntity])],
