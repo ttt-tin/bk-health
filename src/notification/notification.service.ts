@@ -30,4 +30,68 @@ export class NotificationService {
 
     return await queryBuilder.getMany();
   }
+
+  async test(): Promise<any> {
+    try {
+      const testData = [
+        {
+          status: "Success",
+          type: "Cleaning",
+          desc: "Cleaning run successfully",
+          regDate: new Date("2025-04-20T10:00:00Z"),
+        },
+        {
+          status: "Error",
+          type: "Cleaning",
+          desc: "Cleaning run failed",
+          regDate: new Date("2025-04-20T12:00:00Z"),
+        },
+
+        {
+          status: "Success",
+          type: "Cleaning",
+          desc: "Cleaning run successfully",
+          regDate: new Date("2025-04-21T10:00:00Z"),
+        },
+        {
+          status: "Success",
+          type: "Cleaning",
+          desc: "Cleaning run successfully",
+          regDate: new Date("2025-04-22T10:00:00Z"),
+        },
+        {
+          status: "Success",
+          type: "Cleaning",
+          desc: "Cleaning run successfully",
+          regDate: new Date("2025-04-23T10:00:00Z"),
+        },
+        {
+          status: "Error",
+          type: "Cleaning",
+          desc: "Cleaning run failed",
+          regDate: new Date("2025-04-24T10:00:00Z"),
+        },
+        {
+          status: "Success",
+          type: "Cleaning",
+          desc: "Cleaning run successfully",
+          regDate: new Date("2025-04-30T15:00:00Z"),
+        },
+        {
+          status: "Success",
+          type: "Cleaning",
+          desc: "Cleaning run successfully",
+          regDate: new Date("2025-05-01T08:00:00Z"),
+        },
+      ];
+
+      for (const data of testData) {
+        const notification = this.notificationRepository.create(data);
+        await this.notificationRepository.save(notification);
+      }
+    } catch (error) {
+      console.error("Error in test method:", error);
+      throw new Error("Test method failed");
+    }
+  }
 }

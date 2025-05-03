@@ -1,10 +1,10 @@
 /* eslint-disable prettier/prettier */
 import { Injectable } from '@nestjs/common';
 import { spawn } from 'child_process';
-import { HistoryEntity } from './entities/history-run.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { NotificationEntity } from 'src/notification/entities/notification.entity';
+import { HistoryEntity } from 'src/history/entities/history-run.entity';
 
 @Injectable()
 export class PythonService {
