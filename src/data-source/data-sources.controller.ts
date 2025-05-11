@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Delete,
-  Body,
-  Param,
-  ParseIntPipe,
-  HttpCode,
-} from "@nestjs/common";
+import { Controller, Get, Post, Body, Param, Delete } from "@nestjs/common";
 import { DataSourcesService } from "./data-sources.service";
 import { CreateDataSourceDto } from "./dtos/create-data-source.dto";
 import { DataSource } from "./entities/data-source.entity";
@@ -27,13 +18,12 @@ export class DataSourcesController {
   }
 
   @Get(":id")
-  async findOne(@Param("id", ParseIntPipe) id: number): Promise<DataSource> {
-    return this.dataSourcesService.findOne(id);
+  async findOne(@Param("id") id: string): Promise<DataSource> {
+    return this.dataSourcesService.findOne(+id);
   }
 
   @Delete(":id")
-  @HttpCode(204)
-  async remove(@Param("id", ParseIntPipe) id: number): Promise<void> {
-    await this.dataSourcesService.remove(id);
+  async remove(@Param("id") id: string): Promise<void> {
+    return this.dataSourcesService.remove(+id);
   }
 }

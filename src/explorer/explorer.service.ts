@@ -84,4 +84,52 @@ export class ExplorerService {
       throw new Error("Failed to fetch table info");
     }
   }
+
+  async getBucketInfo(bucketName: string) {
+    try {
+      const files = await this.s3Service.listALLFiles(bucketName);
+      const totalSize = files.reduce((sum, file) => sum + file.Size, 0);
+
+      const lastModified = files.length > 0 
+        ? new Date(Math.max(...files.map(f => new Date(f.LastModified).getTime())))
+        : null;
+
+      // Calculate file type distribution
+      const fileTypes: Record<string, number> = {};
+      files.forEach(file => {
+        // Chỉ lấy phần mở rộng của file, bỏ qua các thư mục
+        const key = file.Key || '';
+        if (!key.endsWith('/')) {  // Bỏ qua các thư mục
+          const ext = key.split('.').pop()?.toLowerCase() || 'unknown';
+          fileTypes[ext] = (fileTypes[ext] || 0) + 1;
+        }
+      });
+
+      const totalFiles = Object.values(fileTypes).reduce((sum, count) => sum + count, 0);
+
+      return {
+        bucketName,
+        totalFiles,
+        totalSize: this.formatSize(totalSize),
+        lastModified: lastModified?.toISOString() || "Never",
+        fileTypeDistribution: Object.entries(fileTypes)
+          .map(([type, count]) => ({
+            type,
+            count,
+            percentage: totalFiles > 0 ? ((count / totalFiles) * 100).toFixed(2) : "0.00"
+          }))
+          .sort((a, b) => b.count - a.count) // Sắp xếp theo số lượng file giảm dần
+      };
+    } catch (error) {
+      console.error(`Error getting bucket info for ${bucketName}:`, error);
+      throw new Error(`Failed to get bucket info for ${bucketName}`);
+    }
+  }
+
+  private formatSize(bytes: number): string {
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    if (bytes === 0) return "0 Byte";
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+  }
 }

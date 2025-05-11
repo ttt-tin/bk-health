@@ -118,7 +118,7 @@ export class UploadController {
         const whereCondition = possibleKeys
           .map((key) => `${key} = '${requestData[key]}'`)
           .join(" OR ");
-        const findPatientQuery = `SELECT id FROM patient_repaired WHERE ${whereCondition} LIMIT 1;`;
+        const findPatientQuery = `SELECT id FROM patient WHERE ${whereCondition} LIMIT 1;`;
 
         const result = await this.athenaService.executeQuery(findPatientQuery);
         if (result.length === 0) {
@@ -131,6 +131,7 @@ export class UploadController {
       }
 
       const tableName = requestData.volume;
+      console.log(tableName);
 
       // Insert into the dynamically named table
       const insertQuery = `

@@ -91,7 +91,7 @@ export class AthenaController {
     FROM tables
     WHERE table_name = '${tableName}';
   `;
-    const result = await this.athenaService.executeQuery(query);
+    const result = await this.athenaService.executeQuery(query, "bk_health_lakehouse_db");
     return result[0];
   }
 
@@ -179,5 +179,25 @@ export class AthenaController {
       "hospital_data",
     );
     return tables.length === 0;
+  }
+
+  @Get("statistics")
+  async getAthenaStatistics() {
+    try {
+      const statistics = await this.athenaService.getAthenaStatistics();
+      return {
+        status: "success",
+        data: statistics,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          status: "error",
+          message: "Failed to retrieve Athena statistics",
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

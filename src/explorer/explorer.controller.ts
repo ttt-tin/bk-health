@@ -44,4 +44,25 @@ export class ExplorerController {
       );
     }
   }
+
+  @Get("bucket-info/:bucketName")
+  async getBucketInfo(@Param("bucketName") bucketName: string) {
+    try {
+      const info = await this.explorerService.getBucketInfo(bucketName);
+      return {
+        status: "success",
+        data: info
+      };
+    } catch (error) {
+      console.error(`Error getting bucket info for ${bucketName}:`, error);
+      throw new HttpException(
+        {
+          status: "error",
+          message: `Failed to get bucket info for ${bucketName}`,
+          error: error.message
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
 }

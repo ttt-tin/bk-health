@@ -294,4 +294,40 @@ export class AthenaService {
       throw new Error("Failed to fetch universal keys");
     }
   }
+
+  async getAthenaStatistics() {
+    try {
+      // Get total number of tables
+      const tables = await this.listTables("AwsDataCatalog", "hospital_data");
+      
+      // Get table sizes
+      const tableSizes = await Promise.all(
+        tables.map(async (table) => {
+          const sizeQuery = `
+            SELECT COUNT(*) as row_count
+            FROM "${table}"
+          `;
+          const result = await this.executeQuery(sizeQuery);
+          return {
+            table,
+            rowCount: result[0]?.row_count || 0
+          };
+        })
+      );
+
+      return {
+        totalTables: tables.length,
+        queryStats: {
+          total_queries: 0,
+          successful_queries: 0,
+          failed_queries: 0,
+          avg_execution_time: 0
+        },
+        tableSizes
+      };
+    } catch (error) {
+      console.error("Error getting Athena statistics:", error);
+      throw new Error("Failed to get Athena statistics");
+    }
+  }
 }

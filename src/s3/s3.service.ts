@@ -97,6 +97,7 @@ export class S3Service {
     return allFiles.map((file) => ({
       Key: file.Key,
       LastModified: file.LastModified,
+      Size: file.Size || 0
     }));
   }
 

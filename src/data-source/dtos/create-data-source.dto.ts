@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsEnum } from "class-validator";
+import { IsNotEmpty, IsEnum, IsString } from "class-validator";
 import { DataType, FileType } from "../entities/data-source.entity";
 
 export class CreateDataSourceDto {
@@ -10,4 +10,7 @@ export class CreateDataSourceDto {
 
   @IsEnum(FileType)
   fileType: FileType;
+
+  @IsString()
+  path: string;
 }
