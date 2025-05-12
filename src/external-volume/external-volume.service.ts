@@ -143,7 +143,7 @@ export class ExternalVolumeService {
 
     const results = await this.athenaService.executeQuery(
       query,
-      process.env.LAKEHOUSE_DB,
+      process.env.BK_HEALTH_LAKEHOUSE_DB,
     );
 
     if (!results.length) {
