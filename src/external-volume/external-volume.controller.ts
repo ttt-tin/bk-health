@@ -32,7 +32,8 @@ export class ExternalVolumeController {
   async uploadFile(
     @Param("volumeName") volumeName: string,
     @UploadedFile() file: Express.Multer.File,
+    @Body() requestData: { patient_id?: string; [key: string]: any },
   ) {
-    return this.externalVolumeService.uploadFile(volumeName, file);
+    return this.externalVolumeService.uploadFile(volumeName, file, requestData);
   }
 }

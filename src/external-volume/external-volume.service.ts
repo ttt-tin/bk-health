@@ -202,7 +202,7 @@ export class ExternalVolumeService {
     }
   }
 
-  async uploadFile(volumeName: string, file: Express.Multer.File) {
+  async uploadFile(volumeName: string, file: Express.Multer.File, requestData: { patient_id?: string; [key: string]: any }) {
     try {
       const { container_name, containerClient } =
         await this.getBlobStorageClient(volumeName);
@@ -216,26 +216,57 @@ export class ExternalVolumeService {
       });
 
       // Step 2: Get metadata for the uploaded file
-      const fileSize = file.buffer.length; // Size from the buffer
-      const uploadTimestamp = new Date(); // Current timestamp as upload time
+      const fileSize = file.buffer.length;
+      const uploadTimestamp = new Date();
       const filePath = `${containerClient.url}/${file.originalname}`;
 
-      // Step 3: Insert metadata into the table
+      // Step 3: Find patient_id if not provided
+      let patientId = requestData.patient_id;
+
+      if (!patientId) {
+        const possibleKeys = Object.keys(requestData).filter(
+          (key) => key !== "patient_id" && requestData[key],
+        );
+
+        if (possibleKeys.length === 0) {
+          throw new Error("No valid attributes found to determine patient_id.");
+        }
+
+        const whereCondition = possibleKeys
+          .map((key) => `${key} = '${requestData[key]}'`)
+          .join(" OR ");
+        const findPatientQuery = `SELECT id FROM patient WHERE ${whereCondition} LIMIT 1;`;
+
+        const result = await this.athenaService.executeQuery(findPatientQuery);
+        if (result.length === 0) {
+          throw new Error(
+            "No matching patient_id found for provided attributes.",
+          );
+        }
+
+        patientId = result[0].id;
+      }
+
+      // Step 4: Insert metadata into the table
       const values = `
-        ('${file.originalname}',
+        ('${patientId}',
+         '${file.originalname}',
          '${filePath}',
          '${container_name}',
          ${fileSize},
          TIMESTAMP '${this.formatTimestamp(uploadTimestamp)}')
       `;
       const insertFilesQuery = `
-        INSERT INTO ${volumeName} (file_name, file_path, bucket_name, file_size, upload_timestamp)
+        INSERT INTO ${volumeName} (patient_id, file_name, file_path, bucket_name, file_size, upload_timestamp)
         VALUES ${values};
       `;
       await this.athenaService.executeQuery(insertFilesQuery, "metadata-db");
 
       return {
         message: `Upload file to external volume ${volumeName} successfully and metadata recorded.`,
+        filePath,
+        patientId,
+        table: volumeName,
       };
     } catch (error) {
       console.error("Error uploading file or saving metadata:", error);
