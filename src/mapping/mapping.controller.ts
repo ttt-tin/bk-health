@@ -24,35 +24,39 @@ export class MappingController {
   async create(@Body() createMappingDtos: CreateMappingDto[]) {
     try {
       console.log(JSON.stringify(createMappingDtos));
-      for (const dto of createMappingDtos) {
+      
+      // Tạo một câu query duy nhất cho tất cả các bản ghi
+      const values = createMappingDtos.map(dto => {
         const id = uuidv4();
-        const now = new Date().toISOString(); // ISO string format
-        const query = `
-  INSERT INTO bk_health_lakehouse_db.mapping (
-    id,
-    db_name,
-    db_table,
-    db_column,
-    standard_column,
-    standard_db,
-    standard_table,
-    created_at,
-    updated_at
-  ) VALUES (
-    '${id}',
-    '${dto.dbName}',
-    '${dto.dbTable}',
-    '${dto.dbColumn}',
-    '${dto.standardColumn}',
-    '${dto.standardDb}',
-    '${dto.standardTable}',
-    from_iso8601_timestamp('${now}'),
-    from_iso8601_timestamp('${now}')
-  );
-`;
-        console.log(query);
-        await this.athenaService.executeQuery(query);
-      }
+        const now = new Date().toISOString();
+        return `(
+          '${id}',
+          '${dto.dbName}',
+          '${dto.dbTable}',
+          '${dto.dbColumn}',
+          '${dto.standardColumn}',
+          '${dto.standardDb}',
+          '${dto.standardTable}',
+          from_iso8601_timestamp('${now}'),
+          from_iso8601_timestamp('${now}')
+        )`;
+      }).join(',');
+
+      const query = `
+        INSERT INTO bk_health_lakehouse_db.mapping (
+          id,
+          db_name,
+          db_table,
+          db_column,
+          standard_column,
+          standard_db,
+          standard_table,
+          created_at,
+          updated_at
+        ) VALUES ${values};
+      `;
+
+      await this.athenaService.executeQuery(query);
 
       return {
         success: true,
